@@ -82,6 +82,7 @@ class Trainer(object):
         start_step = 0
         # Restore last training states from checkpoint.
         if from_checkpoint:
+            torch.serialization.add_safe_globals([Recorder])
             ckpt = torch.load(from_checkpoint, map_location="cuda")
 
             start_step = ckpt["step"]
