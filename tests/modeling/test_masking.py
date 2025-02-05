@@ -1,5 +1,5 @@
 import torch
-from gpt2.modeling import PadMasking, FutureMasking
+from src.gpt2.modeling import PadMasking, FutureMasking
 
 
 def test_pad_masking_output_shape():
@@ -34,10 +34,11 @@ def test_pad_masking_output_values():
 
     # Since the tokens added before the sequence are not paddings, they would
     # be excluded in masking.
-    assert (layer(x1, offset=2).long().tolist()
-            == [[0, 0, 1, 1, 0, 1, 0, 0]] * 6)
-    assert (layer(x2, offset=2).long().tolist()
-            == [[[[0, 0, 1, 1, 0, 1, 0, 0]] * 6] * 5] * 3)
+    assert layer(x1, offset=2).long().tolist() == [[0, 0, 1, 1, 0, 1, 0, 0]] * 6
+    assert (
+        layer(x2, offset=2).long().tolist()
+        == [[[[0, 0, 1, 1, 0, 1, 0, 0]] * 6] * 5] * 3
+    )
 
 
 def test_future_masking_output_shape():
@@ -75,5 +76,8 @@ def test_future_masking_output_value():
     # The expanded values also be masked.
     x = torch.randint(8000, (3,))
     assert layer(x).bool().tolist() == [[0, 1, 1], [0, 0, 1], [0, 0, 0]]
-    assert (layer(x, offset=2).bool().tolist()
-            == [[0, 0, 0, 1, 1], [0, 0, 0, 0, 1], [0, 0, 0, 0, 0]])
+    assert layer(x, offset=2).bool().tolist() == [
+        [0, 0, 0, 1, 1],
+        [0, 0, 0, 0, 1],
+        [0, 0, 0, 0, 0],
+    ]

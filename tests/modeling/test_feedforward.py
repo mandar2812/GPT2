@@ -1,5 +1,5 @@
 import torch
-from gpt2.modeling import Swish, PositionwiseFeedForward
+from src.gpt2.modeling import Swish, PositionwiseFeedForward
 
 
 def test_swish_output_shape():

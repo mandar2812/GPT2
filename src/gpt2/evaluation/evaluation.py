@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
-from gpt2.data import Dataset
-from gpt2.evaluation import EvaluationSpec, EvaluateConfig
+from src.gpt2.data import Dataset
+from src.gpt2.evaluation import EvaluationSpec, EvaluateConfig
 from typing import Optional, Dict
 
 
@@ -18,8 +18,8 @@ class Evaluator(object):
         # Load trained model parameters.
         model = self.spec.construct_model().eval()
         if from_model:
-            ckpt = torch.load(from_model, map_location='cpu')
-            model.load_state_dict(ckpt['model'])
+            ckpt = torch.load(from_model, map_location="cpu")
+            model.load_state_dict(ckpt["model"])
 
         # Move the model to GPU device and convert the data type to half
         # precision.
@@ -41,8 +41,9 @@ class Evaluator(object):
         return {k: sum(v) / len(v) for k, v in total_metrics.items()}
 
     @torch.no_grad()
-    def _eval_step(self, dataset: Dataset, model: nn.Module
-                   ) -> Optional[Dict[str, float]]:
+    def _eval_step(
+        self, dataset: Dataset, model: nn.Module
+    ) -> Optional[Dict[str, float]]:
         try:
             data = dataset.fetch(self.config.batch_eval)
             if self.config.use_gpu:

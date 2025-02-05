@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from gpt2.modeling import PositionalEmbedding, TokenEmbedding
+from src.gpt2.modeling import PositionalEmbedding, TokenEmbedding
 
 
 def test_positional_embedding_load_state_dict():
@@ -20,10 +20,8 @@ def test_positional_embedding_load_state_dict():
 
 
 def test_positional_embedding_load_state_dict_with_wrapper():
-    layer_32 = nn.Sequential(
-        PositionalEmbedding(num_embeddings=32, embedding_dim=16))
-    layer_64 = nn.Sequential(
-        PositionalEmbedding(num_embeddings=64, embedding_dim=16))
+    layer_32 = nn.Sequential(PositionalEmbedding(num_embeddings=32, embedding_dim=16))
+    layer_64 = nn.Sequential(PositionalEmbedding(num_embeddings=64, embedding_dim=16))
 
     # Reduce the embedding matrix to decrease the sequence length.
     layer_32.load_state_dict(layer_64.state_dict())
@@ -57,13 +55,28 @@ def test_positional_embedding_output_value():
     x1 = torch.randint(8000, (10,))
     x2 = torch.randint(8000, (5,))
     for offset in range(5):
-        assert (layer(x1)[offset:offset+5] == layer(x2, offset=offset)).all()
+        assert (layer(x1)[offset : offset + 5] == layer(x2, offset=offset)).all()
 
-    x1 = torch.randint(8000, (8, 5, 10,))
-    x2 = torch.randint(8000, (8, 5, 5,))
+    x1 = torch.randint(
+        8000,
+        (
+            8,
+            5,
+            10,
+        ),
+    )
+    x2 = torch.randint(
+        8000,
+        (
+            8,
+            5,
+            5,
+        ),
+    )
     for offset in range(5):
-        assert (layer(x1)[..., offset:offset+5, :]
-                == layer(x2, offset=offset)).all()
+        assert (
+            layer(x1)[..., offset : offset + 5, :] == layer(x2, offset=offset)
+        ).all()
 
 
 def test_token_embedding_output_shape():

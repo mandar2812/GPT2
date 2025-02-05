@@ -1,7 +1,9 @@
-import torch
-from gpt2.modeling import Past
-from gpt2.generation import GenerationSpec, GenerateConfig
 from typing import List, Optional, Tuple
+
+import torch
+
+from src.gpt2.generation import GenerateConfig, GenerationSpec
+from src.gpt2.modeling import Past
 
 
 class Generator(object):
@@ -16,8 +18,8 @@ class Generator(object):
 
         # Load trained model parameters.
         if from_model:
-            ckpt = torch.load(from_model, map_location='cpu')
-            self.model.load_state_dict(ckpt['model'])
+            ckpt = torch.load(from_model, map_location="cpu")
+            self.model.load_state_dict(ckpt["model"])
 
         # Move the model to GPU device and convert the data type to half
         # precision.
@@ -40,13 +42,13 @@ class Generator(object):
         return self.spec.decode_tokens(words)
 
     @torch.no_grad()
-    def _predict_probs(self,
-                       words: List[int],
-                       past: Optional[List[Past]] = None
-                       ) -> Tuple[torch.Tensor, List[Past]]:
+    def _predict_probs(
+        self, words: List[int], past: Optional[List[Past]] = None
+    ) -> Tuple[torch.Tensor, List[Past]]:
         x = torch.tensor(words, dtype=torch.long)
         x = self.spec.decorate_sequence(
-            x, offset=past[0][0].size(-2) if past is not None else 0)
+            x, offset=past[0][0].size(-2) if past is not None else 0
+        )
 
         if self.config.use_gpu:
             logits, past = self.model(x.cuda(), past)

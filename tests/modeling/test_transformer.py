@@ -1,5 +1,5 @@
 import torch
-from gpt2.modeling import TransformerLayer, Transformer
+from src.gpt2.modeling import TransformerLayer, Transformer
 
 
 def test_transformer_layer_output_shape():
@@ -23,17 +23,25 @@ def test_transformer_layer_output_shape():
     assert past[1].shape == (3, 2, 15, 16)
 
     # Previously calculated attention values are also masked by masking tensor.
-    x, past = layer(torch.zeros((3, 2, 3, 16)),
-                    past=past,
-                    mask=torch.zeros((3, 2, 3, 18)).bool())
+    x, past = layer(
+        torch.zeros((3, 2, 3, 16)), past=past, mask=torch.zeros((3, 2, 3, 18)).bool()
+    )
     assert x.shape == (3, 2, 3, 16)
     assert past[0].shape == (3, 2, 18, 16)
     assert past[1].shape == (3, 2, 18, 16)
 
 
 def test_transformer_output_shape():
-    model = Transformer(layers=2, pad_idx=0, words=80, seq_len=100, heads=2,
-                        dims=16, rate=4, bidirectional=False).eval()
+    model = Transformer(
+        layers=2,
+        pad_idx=0,
+        words=80,
+        seq_len=100,
+        heads=2,
+        dims=16,
+        rate=4,
+        bidirectional=False,
+    ).eval()
 
     x, past = model(torch.randint(80, (10,)))
     assert x.shape == (10, 80)
@@ -57,8 +65,16 @@ def test_transformer_output_shape():
 
 
 def test_transformer_generating_sequence():
-    model = Transformer(layers=2, pad_idx=0, words=80, seq_len=100, heads=2,
-                        dims=16, rate=4, bidirectional=False).eval()
+    model = Transformer(
+        layers=2,
+        pad_idx=0,
+        words=80,
+        seq_len=100,
+        heads=2,
+        dims=16,
+        rate=4,
+        bidirectional=False,
+    ).eval()
 
     past = None
     for _ in range(10):

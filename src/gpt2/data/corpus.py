@@ -1,15 +1,13 @@
 import torch
-from gpt2.data import Dataset, Vocab
+from src.gpt2.data import Dataset, Vocab
 from typing import Dict, Any, List, Optional
 
 
 class TokenizedCorpus(Dataset):
-    def __init__(self,
-                 corpus_path: str,
-                 vocab: Vocab,
-                 seq_len: int,
-                 repeat: bool = True):
-        self.corpus_fp = open(corpus_path, 'r', encoding='utf-8')
+    def __init__(
+        self, corpus_path: str, vocab: Vocab, seq_len: int, repeat: bool = True
+    ):
+        self.corpus_fp = open(corpus_path, "r", encoding="utf-8")
         self.vocab = vocab
         self.seq_len = seq_len
         self.repeat = repeat
@@ -47,7 +45,7 @@ class TokenizedCorpus(Dataset):
             indices = [self.vocab.bos_idx] + indices + [self.vocab.eos_idx]
             indices += [self.vocab.pad_idx] * (self.seq_len - len(indices) + 1)
 
-            return {'input': indices[:-1], 'output': indices[1:]}
+            return {"input": indices[:-1], "output": indices[1:]}
 
     def fetch(self, batch: Optional[int] = None) -> Dict[str, torch.Tensor]:
         if batch is None:
@@ -59,7 +57,7 @@ class TokenizedCorpus(Dataset):
         return {k: torch.tensor(v, dtype=torch.long) for k, v in data.items()}
 
     def where(self) -> Dict[str, Any]:
-        return {'offset': self.corpus_fp.tell()}
+        return {"offset": self.corpus_fp.tell()}
 
     def assign(self, where: Dict[str, Any]):
-        self.corpus_fp.seek(where['offset'])
+        self.corpus_fp.seek(where["offset"])

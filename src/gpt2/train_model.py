@@ -2,10 +2,10 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from gpt2.utils import fusing
-from gpt2.modeling import Transformer
-from gpt2.data import Dataset, Vocab, TokenizedCorpus
-from gpt2.training import TrainConfig, TrainingSpec, Trainer
+from src.gpt2.utils import fusing
+from src.gpt2.modeling import Transformer
+from src.gpt2.data import Dataset, Vocab, TokenizedCorpus
+from src.gpt2.training import TrainConfig, TrainingSpec, Trainer
 from typing import Tuple, Iterator, Dict
 
 

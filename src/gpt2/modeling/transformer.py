@@ -2,10 +2,16 @@ import torch
 import torch.nn as nn
 import torch.utils.checkpoint
 from functools import partial
-from gpt2.utils.fusing import LayerNorm
-from gpt2.modeling import (PadMasking, FutureMasking, AttentionLayer, Past,
-                           PositionalEmbedding, TokenEmbedding,
-                           PositionwiseFeedForward)
+from src.gpt2.utils.fusing import LayerNorm
+from src.gpt2.modeling import (
+    PadMasking,
+    FutureMasking,
+    AttentionLayer,
+    Past,
+    PositionalEmbedding,
+    TokenEmbedding,
+    PositionwiseFeedForward,
+)
 from typing import Optional, Tuple, List, Union
 
 
@@ -21,22 +27,20 @@ class TransformerLayer(nn.Module):
     output 2 (*)    float           (..., past_len + seq_len, dims)
     ===========================================================================
     """
-    def __init__(self,
-                 heads: int,
-                 dims: int,
-                 rate: int,
-                 dropout: float = 0.1):
+
+    def __init__(self, heads: int, dims: int, rate: int, dropout: float = 0.1):
         super().__init__()
         self.attn = AttentionLayer(heads, dims, dropout)
         self.ff = PositionwiseFeedForward(dims, rate, dropout)
         self.ln_attn = LayerNorm(dims)
         self.ln_ff = LayerNorm(dims)
 
-    def forward(self,
-                x: torch.Tensor,
-                past: Optional[Past] = None,
-                mask: Optional[torch.Tensor] = None,
-                ) -> Union[torch.Tensor, Tuple[torch.Tensor, Past]]:
+    def forward(
+        self,
+        x: torch.Tensor,
+        past: Optional[Past] = None,
+        mask: Optional[torch.Tensor] = None,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, Past]]:
         # Layer normalizations are performed before the layers respectively.
         a = self.ln_attn(x)
         a, past = self.attn(a, a, a, past, mask)
@@ -58,16 +62,19 @@ class Transformer(nn.Module):
     output 2 (**)   float           (..., past_len + seq_len, dims)
     ===========================================================================
     """
-    def __init__(self,
-                 layers: int,
-                 pad_idx: int,
-                 words: int,
-                 seq_len: int,
-                 heads: int,
-                 dims: int,
-                 rate: int = 4,
-                 dropout: float = 0.1,
-                 bidirectional: bool = True):
+
+    def __init__(
+        self,
+        layers: int,
+        pad_idx: int,
+        words: int,
+        seq_len: int,
+        heads: int,
+        dims: int,
+        rate: int = 4,
+        dropout: float = 0.1,
+        bidirectional: bool = True,
+    ):
         super().__init__()
         self.bidirectional = bidirectional
         self.pad_masking = PadMasking(pad_idx)
@@ -77,16 +84,17 @@ class Transformer(nn.Module):
         self.token_embedding = TokenEmbedding(words, dims)
         self.dropout_embedding = nn.Dropout(dropout)
 
-        self.transformers = nn.ModuleList([
-            TransformerLayer(heads, dims, rate, dropout)
-            for _ in range(layers)])
+        self.transformers = nn.ModuleList(
+            [TransformerLayer(heads, dims, rate, dropout) for _ in range(layers)]
+        )
         self.ln_head = LayerNorm(dims)
 
-    def forward(self,
-                x: torch.Tensor,
-                past: Optional[List[Past]] = None,
-                use_grad_ckpt: bool = False
-                ) -> Union[torch.Tensor, Tuple[torch.Tensor, List[Past]]]:
+    def forward(
+        self,
+        x: torch.Tensor,
+        past: Optional[List[Past]] = None,
+        use_grad_ckpt: bool = False,
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, List[Past]]]:
         offset = past[0][0].size(-2) if past is not None else 0
 
         # Create masking tensor.
@@ -102,8 +110,7 @@ class Transformer(nn.Module):
         present = []
         for i, transformer in enumerate(self.transformers):
             if self.training and use_grad_ckpt:
-                transformer = partial(torch.utils.checkpoint.checkpoint,
-                                      transformer)
+                transformer = partial(torch.utils.checkpoint.checkpoint, transformer)
 
             x = transformer(x, past[i] if past is not None else None, mask)
 

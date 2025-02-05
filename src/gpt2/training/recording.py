@@ -8,7 +8,7 @@ class Recorder(object):
 
     def record(self, metrics: Dict[str, float], scope: Optional[str] = None):
         for name, value in metrics.items():
-            name = f'{scope}/{name}' if scope else name
+            name = f"{scope}/{name}" if scope else name
 
             if name not in self.batch_metrics:
                 self.batch_metrics[name] = []
@@ -25,5 +25,6 @@ class Recorder(object):
         self.batch_metrics.clear()
 
     def format(self, fstring: str) -> str:
-        return fstring.format(**{
-            k.replace('/', '_'): v[-1][1] for k, v in self.metrics.items()})
+        return fstring.format(
+            **{k.replace("/", "_"): v[-1][1] for k, v in self.metrics.items()}
+        )

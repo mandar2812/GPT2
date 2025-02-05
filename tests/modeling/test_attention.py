@@ -1,5 +1,5 @@
 import torch
-from gpt2.modeling import BaseAttention, MultiHeadAttention, AttentionLayer
+from src.gpt2.modeling import BaseAttention, MultiHeadAttention, AttentionLayer
 
 
 def test_base_attention_output_shape():

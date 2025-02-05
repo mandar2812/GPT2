@@ -1,7 +1,9 @@
+from typing import Dict
+
 import torch
 import torch.nn as nn
-from gpt2.data import Dataset
-from typing import Dict
+
+from src.gpt2.data import Dataset
 
 
 class EvaluationSpec(object):
@@ -14,6 +16,7 @@ class EvaluationSpec(object):
     def construct_model(self) -> nn.Module:
         raise NotImplementedError()
 
-    def eval_objective(self, data: Dict[str, torch.Tensor], model: nn.Module
-                       ) -> Dict[str, torch.Tensor]:
+    def eval_objective(
+        self, data: Dict[str, torch.Tensor], model: nn.Module
+    ) -> Dict[str, torch.Tensor]:
         raise NotImplementedError()
