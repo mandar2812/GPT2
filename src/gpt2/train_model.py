@@ -1,3 +1,4 @@
+import os
 import argparse
 import torch
 import torch.nn as nn
@@ -72,8 +73,10 @@ class GPT2TrainingSpec(TrainingSpec):
 
 def train_gpt2_model(args: argparse.Namespace):
     spec = GPT2TrainingSpec(
-        train_corpus=args.train_corpus, eval_corpus=args.eval_corpus,
-        vocab_path=args.vocab_path, seq_len=args.seq_len, layers=args.layers,
+        train_corpus=os.path.join(args.corpus_dir, args.train_corpus), 
+        eval_corpus=os.path.join(args.corpus_dir, args.eval_corpus),
+        vocab_path=os.path.join(args.corpus_dir, args.vocab_path), 
+        seq_len=args.seq_len, layers=args.layers,
         heads=args.heads, dims=args.dims, rate=args.rate, dropout=args.dropout,
         base_lr=args.base_lr, wd_rate=args.wd_rate,
         total_steps=args.total_steps, use_grad_ckpt=args.use_grad_ckpt)
@@ -94,6 +97,8 @@ def add_subparser(subparsers: argparse._SubParsersAction):
     parser = subparsers.add_parser('train', help='train GPT-2 model')
 
     group = parser.add_argument_group('Corpus and vocabulary')
+    group.add_argument('corpus_dir', help='root directory of corpus files', 
+                        default=os.getcwd())
     group.add_argument('--train_corpus', required=True,
                        help='training corpus file path')
     group.add_argument('--eval_corpus', required=True,
