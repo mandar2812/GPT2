@@ -1,6 +1,9 @@
 import argparse
 import torch.nn as nn
-from src.gpt2.data import Vocab, Tokenizer
+from tokenizers import Tokenizer, models, decoders
+from tokenizers.normalizers import NFKC, Lowercase, Sequence
+from tokenizers.pre_tokenizers import ByteLevel
+from src.gpt2.data import Vocab
 from src.gpt2.modeling import Transformer
 from src.gpt2.generation import GenerationSpec, GenerateConfig, Generator
 from typing import List
@@ -10,6 +13,7 @@ class GPT2GenerationSpec(GenerationSpec):
     def __init__(
         self,
         vocab_path: str,
+        merges_path: str,
         seq_len: int,
         layers: int,
         heads: int,
@@ -17,15 +21,35 @@ class GPT2GenerationSpec(GenerationSpec):
         rate: int,
     ):
         self.vocab_path = vocab_path
+        self.merges_path = merges_path
         self.seq_len = seq_len
         self.layers = layers
         self.heads = heads
         self.dims = dims
         self.rate = rate
+        self.vocab = Vocab(self.vocab_path)
+        self.tokenizer = Tokenizer(
+            models.BPE.from_file(
+                self.vocab_path, self.merges_path, unk_token=self.vocab.unk_token
+            )
+        )
 
     def initialize(self):
-        self.vocab = Vocab(vocab_path=self.vocab_path)
-        self.tokenizer = Tokenizer(vocab=self.vocab)
+        self.tokenizer.add_special_tokens(
+            [
+                self.vocab.unk_token,
+                self.vocab.eos_token,
+                self.vocab.bos_token,
+                self.vocab.pad_token,
+            ]
+        )
+
+        # Set normalizers (Unicode normalization + lowercasing)
+        self.tokenizer.normalizer = Sequence([NFKC(), Lowercase()])
+        # Set pre-tokenizer to byte-level (like GPT)
+        self.tokenizer.pre_tokenizer = ByteLevel()
+
+        self.tokenizer.decoder = decoders.ByteLevel()
 
     def construct_model(self) -> nn.Module:
         return Transformer(
@@ -41,20 +65,16 @@ class GPT2GenerationSpec(GenerationSpec):
         )
 
     def encode_context(self, context: str) -> List[int]:
-        tokens = [self.vocab[t] for t in self.tokenizer.encode(context)]
-        tokens = [self.vocab.bos_idx] + tokens
-
-        return tokens
+        return self.tokenizer.encode(context).ids
 
     def decode_tokens(self, tokens: List[int]) -> str:
-        if self.vocab.eos_idx in tokens:
-            tokens = tokens[: tokens.index(self.vocab.eos_idx) + 1]
-        return self.tokenizer.decode([self.vocab[t] for t in tokens])
+        return self.tokenizer.decode(tokens)
 
 
 def generate_sentence_with_gpt2_model(args: argparse.Namespace):
     spec = GPT2GenerationSpec(
         vocab_path=args.vocab_path,
+        merges_path=args.merges_path,
         seq_len=args.seq_len,
         layers=args.layers,
         heads=args.heads,
@@ -78,6 +98,7 @@ def add_subparser(subparsers: argparse._SubParsersAction):
     )
 
     parser.add_argument("--vocab_path", required=True, help="vocabulary file path")
+    parser.add_argument("--merges_path", required=True, help="merges file path")
     parser.add_argument(
         "--model_path", required=True, help="trained GPT-2 model file path"
     )
