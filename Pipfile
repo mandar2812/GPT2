@@ -9,6 +9,9 @@ tqdm = "*"
 torch = "*"
 numpy = "*"
 matplotlib = "*"
+tokenizers = "*"
+torchtune = "*"
+torchao = "*"
 
 [dev-packages]
 

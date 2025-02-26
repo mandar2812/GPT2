@@ -1,4 +1,5 @@
 from typing import Union
+import json
 
 
 class Vocab(object):
@@ -13,12 +14,17 @@ class Vocab(object):
         self.eos_token = eos_token
         self.pad_token = pad_token
 
-        with open(vocab_path, 'r', encoding='utf-8') as fp:
-            self.additional_tokens = [bos_token, eos_token, pad_token]
+        if vocab_path.endswith(".json"):
+            with open(vocab_path, 'r', encoding='utf-8') as fp:
+                self.vocab = json.load(fp)
+                self.words = list(self.vocab.keys())
+        else:
+            with open(vocab_path, 'r', encoding='utf-8') as fp:
+                self.additional_tokens = [bos_token, eos_token, pad_token]
 
-            # The additional tokens would be inserted before the words.
-            self.words = self.additional_tokens + fp.read().split()
-            self.vocab = {word: i for i, word in enumerate(self.words)}
+                # The additional tokens would be inserted before the words.
+                self.words = self.additional_tokens + fp.read().split()
+                self.vocab = {word: i for i, word in enumerate(self.words)}
 
     def __getitem__(self, idx_or_token: Union[int, str]) -> Union[str, int]:
         if isinstance(idx_or_token, str):
