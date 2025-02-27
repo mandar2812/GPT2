@@ -166,14 +166,9 @@ The example figure is as bellow:
 
 ![figure](./example-figure.png)
 
-## Using [apex](https://github.com/NVIDIA/apex) in training
-While training, you can use **NVIDIA apex** to use fused CUDA layers and mixed-precision optimization. The option `--use_amp` enables **automatic mixed precision** in training. Before using these performance boosting, you should install **NVIDIA apex** library by following [the repository](https://github.com/NVIDIA/apex), or run belows:
+## Mixed Precision Training
 
-    $ git clone https://github.com/NVIDIA/apex
-    $ cd apex
-    $ pip install -v --no-cache-dir --global-option="--cpp_ext" --global-option="--cuda_ext" ./
-
-If you cannot install the library or your GPU device does not support fast mixed-precision training (precisely, GPU should support mixed-precision acceleration through [Tensor Cores](https://developer.nvidia.com/tensor-cores)), you can train the model in single-precision mode. Mixed-precision training is an option. In that case, you can still use fused CUDA layers such as Adam optimizer and layer normalization in training.
+Mixed precision training is possible with `torch.amp`, provided your GPU meets the requirements. Use the `--use_amp` flag in the training program.
 
 ## Play in Google Colab!
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/affjljoo3581/GPT2/blob/master/GPT2_Interactive_Notebook.ipynb)

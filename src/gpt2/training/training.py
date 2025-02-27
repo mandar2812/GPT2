@@ -8,11 +8,6 @@ from src.gpt2.data import Dataset
 from src.gpt2.training import TrainingSpec, TrainConfig, Recorder
 from typing import Dict, Optional
 
-try:
-    from apex import amp
-except ModuleNotFoundError:
-    pass
-
 import warnings
 
 warnings.filterwarnings(action="ignore")
@@ -71,10 +66,7 @@ class Trainer(object):
         optimizer, scheduler = self.spec.create_optimizer(model.parameters())
         recorder = Recorder()
 
-        if self.config.use_amp:
-            model, optimizer = amp.initialize(
-                model, optimizer, opt_level="O2", verbosity=0
-            )
+        scaler = torch.amp.GradScaler() if self.config.use_amp else None
 
         if self.config.distributed:
             model = nn.parallel.DistributedDataParallel(model, device_ids=[rank])
@@ -96,7 +88,7 @@ class Trainer(object):
             eval_dataset.assign(ckpt["eval_dataset"])
 
             if self.config.use_amp:
-                amp.load_state_dict(ckpt["amp"])
+                scaler.load_state_dict(ckpt["amp"])
 
             # Because the checkpoint data allocates quite a lot of GPU
             # memories, we need to free the memories explicitly.
@@ -122,7 +114,7 @@ class Trainer(object):
             torch.cuda.empty_cache()
 
             recorder.record(
-                self._train_step(rank, train_dataset, model, optimizer, scheduler),
+                self._train_step(rank, train_dataset, model, optimizer, scheduler, scaler),
                 scope="train",
             )
 
@@ -153,7 +145,7 @@ class Trainer(object):
                 }
 
                 if self.config.use_amp:
-                    ckpt["amp"] = amp.state_dict()
+                    ckpt["amp"] = scaler.state_dict()
 
                 torch.save(ckpt, self.config.save_checkpoint_path)
 
@@ -162,13 +154,9 @@ class Trainer(object):
                 del ckpt
                 torch.cuda.empty_cache()
 
-        # Since the model is wrapped with `DistributedDataParallel` class in
-        # distributed training environment, the original model can be accessed
-        # by `module` attribute.
         if self.config.distributed:
             model = model.module
 
-        # Save trained model weights and metrics recorded during the training.
         if rank == 0:
             torch.save(
                 {"model": model.cpu().state_dict(), "metrics": recorder.metrics},
@@ -182,21 +170,25 @@ class Trainer(object):
         model: nn.Module,
         optimizer: optim.Optimizer,
         scheduler: optim.lr_scheduler._LRScheduler,
+        scaler: Optional[torch.amp.GradScaler]
     ) -> Dict[str, float]:
         model.train()
         optimizer.zero_grad()
-
         data = self._fetch_from(dataset, rank, self.config.batch_train)
-        metrics = self.spec.train_objective(data, model)
-        loss = metrics["loss"]
-
-        if self.config.use_amp:
-            with amp.scale_loss(loss, optimizer) as scaled_loss:
-                scaled_loss.backward()
+        if scaler:
+            with torch.autocast(device_type="cuda", dtype=torch.float16):
+                metrics = self.spec.train_objective(data, model)
+                loss = metrics["loss"]
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
         else:
+            data = self._fetch_from(dataset, rank, self.config.batch_train)
+            metrics = self.spec.train_objective(data, model)
+            loss = metrics["loss"]
             loss.backward()
+            optimizer.step()
 
-        optimizer.step()
         scheduler.step()
 
         return {k: self._to_value(v) for k, v in metrics.items()}
