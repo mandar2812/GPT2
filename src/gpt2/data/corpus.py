@@ -39,11 +39,20 @@ class TokenizedCorpus(Dataset):
             # Use token indices rather than the token names directly.
             indices = [self.vocab[t] for t in line.split()]
             if len(indices) + 2 > self.seq_len:
-                continue
+                # Apply sliding window approach instead of skipping
+                outputs = []
+                for start in range(0, len(indices), self.seq_len - 2):
+                    window = indices[start : start + (self.seq_len - 2)]
+                    window = [self.vocab.bos_idx] + window  # Ensure each window starts with BOS
+                    if start + (self.seq_len - 2) >= len(indices):
+                        window.append(self.vocab.eos_idx)  # Only last window gets EOS
+                    window += [self.vocab.pad_idx] * (self.seq_len - len(window))
+                    outputs.append({"input": window[:-1], "output": window[1:]})
+                return outputs[0]  # Return first chunk for now, batching can handle multiple
 
             # Decorate the sequence with additional tokens.
             indices = [self.vocab.bos_idx] + indices + [self.vocab.eos_idx]
-            indices += [self.vocab.pad_idx] * (self.seq_len - len(indices) + 1)
+            indices += [self.vocab.pad_idx] * (self.seq_len - len(indices))
 
             return {"input": indices[:-1], "output": indices[1:]}
 
