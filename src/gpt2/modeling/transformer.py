@@ -8,7 +8,6 @@ from src.gpt2.modeling import (
     FutureMasking,
     AttentionLayer,
     Past,
-    PositionalEmbedding,
     TokenEmbedding,
     PositionwiseFeedForward,
 )
@@ -80,7 +79,7 @@ class Transformer(nn.Module):
         self.pad_masking = PadMasking(pad_idx)
         self.future_masking = FutureMasking()
 
-        self.positional_embedding = PositionalEmbedding(seq_len, dims)
+        # self.positional_embedding = PositionalEmbedding(seq_len, dims)
         self.token_embedding = TokenEmbedding(words, dims)
         self.dropout_embedding = nn.Dropout(dropout)
 
@@ -102,8 +101,8 @@ class Transformer(nn.Module):
         if not self.bidirectional:
             mask = mask + self.future_masking(x, offset)
 
-        # Use token embedding and positional embedding layers.
-        x = self.token_embedding(x) + self.positional_embedding(x, offset)
+        # Use token embedding.
+        x = self.token_embedding(x) # + self.positional_embedding(x, offset)
         x = self.dropout_embedding(x)
 
         # Apply transformer layers sequentially.
