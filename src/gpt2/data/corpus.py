@@ -5,13 +5,20 @@ from typing import Dict, Any, List, Optional, Generator
 
 class TokenizedCorpus(Dataset):
     def __init__(
-        self, corpus_path: str, vocab: Vocab, seq_len: int, repeat: bool = True, overlap: int = None
+        self,
+        corpus_path: str,
+        vocab: Vocab,
+        seq_len: int,
+        repeat: bool = True,
+        overlap: int = None,
     ):
         self.corpus_fp = open(corpus_path, "r", encoding="utf-8")
         self.vocab = vocab
         self.seq_len = seq_len
         self.repeat = repeat
-        self.overlap = overlap if overlap is not None else seq_len // 2  # Default to 50% overlap
+        self.overlap = (
+            overlap if overlap is not None else seq_len // 2
+        )  # Default to 50% overlap
 
     def skip(self, count: int):
         for _ in range(count):
@@ -49,9 +56,15 @@ class TokenizedCorpus(Dataset):
             else:
                 for start in range(0, len(indices), stride):
                     window = indices[start : start + (self.seq_len - 2)]
-                    window = [self.vocab.bos_idx] + window  # Ensure each window starts with BOS
+
+                    # Add BOS only for the first window
+                    if start == 0:
+                        window = [self.vocab.bos_idx] + window
+
+                    # Add EOS only for the last window
                     if start + (self.seq_len - 2) >= len(indices):
-                        window.append(self.vocab.eos_idx)  # Only last window gets EOS
+                        window.append(self.vocab.eos_idx)
+
                     window += [self.vocab.pad_idx] * (self.seq_len - len(window))
                     yield {"input": window[:-1], "output": window[1:]}
 
