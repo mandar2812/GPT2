@@ -15,6 +15,7 @@ class BaseAttention(nn.Module):
     k               float           (..., kv_len, dims)
     v               float           (..., kv_len, dims)
     mask            bool            (..., query_len, kv_len)
+    bias            float           (..., query_len, kv_len)
     ---------------------------------------------------------------------------
     output          float           (..., query_len, dims)
     ===========================================================================
@@ -27,11 +28,16 @@ class BaseAttention(nn.Module):
                 q: torch.Tensor,
                 k: torch.Tensor,
                 v: torch.Tensor,
-                mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+                mask: Optional[torch.Tensor] = None,
+                bias: Optional[torch.Tensor] = None) -> torch.Tensor:
         x = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(k.size(-1))
 
+        if bias is not None:
+            x += bias
+
         if mask is not None:
-            x += mask.type_as(x) * x.new_tensor(-1e4)
+            x += (mask.type_as(x) * x.new_tensor(-1e4))
+
         x = self.dropout(x.softmax(-1))
 
         return torch.matmul(x, v)
@@ -65,17 +71,15 @@ class MultiHeadAttention(BaseAttention):
         v = v.view(v.size()[:-1] + (self.heads, v.size(-1) // self.heads))
 
         q = q.transpose(-3, -2)
-        alibi_mask = self.alibi_masking(q)
+        alibi_bias = self.alibi_masking(q)
         k = k.transpose(-3, -2)
         v = v.transpose(-3, -2)
 
         if mask is not None:
-            mask = mask.unsqueeze(-3) + alibi_mask
-        else:
-            mask = alibi_mask
+            mask = mask.unsqueeze(-3)
 
         # Calculate multi-headed attentions and merge them into one.
-        return (super().forward(q, k, v, mask)
+        return (super().forward(q, k, v, mask, bias=alibi_bias)
                 .transpose(-3, -2)
                 .contiguous()
                 .view(q.size()[:-3] + (q.size(-2), v.size(-1) * self.heads)))
