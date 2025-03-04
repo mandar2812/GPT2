@@ -77,7 +77,8 @@ class Trainer(object):
             torch.serialization.add_safe_globals([Recorder])
             ckpt = torch.load(from_checkpoint, map_location="cuda")
 
-            start_step = ckpt["step"]
+            start_step = int(ckpt["step"])
+            print(f"Restoring training states from step {start_step}.")
             recorder = ckpt["recorder"]
 
             model.load_state_dict(ckpt["model"])
@@ -100,11 +101,11 @@ class Trainer(object):
             # training.
             training_iters = tqdm.tqdm(
                 range(start_step + 1, self.config.total_steps),
-                total=self.config.total_steps,
+                total=self.config.total_steps - start_step - 1,
                 desc=self.config.description,
                 dynamic_ncols=True,
             )
-            training_iters.update(start_step + 1)
+           # training_iters.update(start_step + 1)
         else:
             # In other processes, use simple iterator rather than tqdm one.
             training_iters = range(start_step + 1, self.config.total_steps)
