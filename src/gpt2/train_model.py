@@ -54,8 +54,8 @@ class GPT2TrainingSpec(TrainingSpec):
                                     optim.lr_scheduler._LRScheduler]:
         optimizer = fusing.Adam(
             params, lr=self.base_lr, weight_decay=self.wd_rate)
-        scheduler = optim.lr_scheduler.LambdaLR(
-            optimizer, lambda step: 1 - step / self.total_steps)
+        scheduler = optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=1_000_000, eta_min=1e-5)
         return optimizer, scheduler
 
     def train_objective(self, data: Dict[str, torch.Tensor], model: nn.Module
