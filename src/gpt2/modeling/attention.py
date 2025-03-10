@@ -2,7 +2,6 @@ import math
 import torch
 import torch.nn as nn
 from typing import Optional, Tuple
-from src.gpt2.modeling.masking import ALiBiMasking
 
 Past = Tuple[torch.Tensor, torch.Tensor]
 
@@ -58,7 +57,6 @@ class MultiHeadAttention(BaseAttention):
     def __init__(self, heads: int, dropout: float = 0.1):
         super().__init__(dropout)
         self.heads = heads
-        self.alibi_masking = ALiBiMasking(heads)
 
     def forward(self,
                 q: torch.Tensor,
@@ -71,7 +69,6 @@ class MultiHeadAttention(BaseAttention):
         v = v.view(v.size()[:-1] + (self.heads, v.size(-1) // self.heads))
 
         q = q.transpose(-3, -2)
-        alibi_bias = self.alibi_masking(q)
         k = k.transpose(-3, -2)
         v = v.transpose(-3, -2)
 
@@ -79,7 +76,7 @@ class MultiHeadAttention(BaseAttention):
             mask = mask.unsqueeze(-3)
 
         # Calculate multi-headed attentions and merge them into one.
-        return (super().forward(q, k, v, mask, bias=alibi_bias)
+        return (super().forward(q, k, v, mask)
                 .transpose(-3, -2)
                 .contiguous()
                 .view(q.size()[:-3] + (q.size(-2), v.size(-1) * self.heads)))
