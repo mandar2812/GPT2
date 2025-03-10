@@ -60,7 +60,7 @@ class GPT2GenerationSpec(GenerationSpec):
             heads=self.heads,
             dims=self.dims,
             rate=self.rate,
-            dropout=0,
+            dropout=0.1,
             bidirectional=False,
         )
 
