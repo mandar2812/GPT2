@@ -1,23 +1,29 @@
-from typing import Union
+from typing import Union, Optional
 import json
 
 
 class Vocab(object):
     def __init__(self,
-                 vocab_path: str,
+                 vocab_path: str = '',
                  unk_token: str = '<unk>',
                  bos_token: str = '<s>',
                  eos_token: str = '</s>',
-                 pad_token: str = '<pad>'):
+                 pad_token: str = '<pad>',
+                 vocab: Optional[dict[str, int]] = None):
         self.unk_token = unk_token
         self.bos_token = bos_token
         self.eos_token = eos_token
         self.pad_token = pad_token
 
-        if vocab_path.endswith(".json"):
+        if vocab is not None:
+            self.vocab = vocab
+            self.words = list(
+                map(lambda tp: tp[0], sorted(list(vocab.items()), key=lambda tp: tp[1]))
+            )
+        elif vocab_path.endswith(".json"):
             with open(vocab_path, 'r', encoding='utf-8') as fp:
                 self.vocab = json.load(fp)
-                self.words = list(self.vocab.keys())
+                self.words = list(self.vocab)
         else:
             with open(vocab_path, 'r', encoding='utf-8') as fp:
                 self.additional_tokens = [bos_token, eos_token, pad_token]

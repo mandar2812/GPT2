@@ -1,3 +1,4 @@
+from tqdm import tqdm
 import torch
 import torch.nn as nn
 from src.gpt2.data import Dataset
@@ -27,16 +28,24 @@ class Evaluator(object):
             model.cuda().half()
 
         total_metrics = {}
-        for _ in self.config.iterate():
-            batch_metrics = self._eval_step(eval_dataset, model)
-            if batch_metrics is None:
-                break
+        with tqdm(desc="Evaluating GPT2") as pbar:
+            eval_step = 0
+            for _ in self.config.iterate():
+                batch_metrics = self._eval_step(eval_dataset, model)
+                pbar.update(1)
+                if batch_metrics is None:
+                    break
 
-            # Record the batched metrics.
-            for k, v in batch_metrics.items():
-                if k not in total_metrics:
-                    total_metrics[k] = []
-                total_metrics[k].append(v)
+                # Record the batched metrics.
+                for k, v in batch_metrics.items():
+                    if k not in total_metrics:
+                        total_metrics[k] = []
+                    total_metrics[k].append(v)
+                if (eval_step + 1) % 20 == 0:
+                    pbar.set_postfix(
+                        {k: sum(v) / len(v) for k, v in total_metrics.items()}
+                    )
+                eval_step += 1
 
         return {k: sum(v) / len(v) for k, v in total_metrics.items()}
 

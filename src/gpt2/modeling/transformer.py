@@ -80,7 +80,7 @@ class Transformer(nn.Module):
         self.future_masking = FutureMasking()
 
         # self.positional_embedding = PositionalEmbedding(seq_len, dims)
-        self.token_embedding = TokenEmbedding(words, dims)
+        self.token_embedding = TokenEmbedding(words, dims, padding_idx=pad_idx)
         self.dropout_embedding = nn.Dropout(dropout)
 
         self.transformers = nn.ModuleList(

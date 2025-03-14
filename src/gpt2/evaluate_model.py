@@ -1,6 +1,8 @@
 import argparse
+import os
 import torch
 import torch.nn as nn
+from tokenizers import Tokenizer
 from src.gpt2.modeling import Transformer
 from src.gpt2.data import Dataset, Vocab, TokenizedCorpus
 from src.gpt2.evaluation import EvaluationSpec, EvaluateConfig, Evaluator
@@ -11,7 +13,7 @@ class GPT2EvaluationSpec(EvaluationSpec):
     def __init__(
         self,
         eval_corpus: str,
-        vocab_path: str,
+        tokenizer_path: str,
         seq_len: int,
         layers: int,
         heads: int,
@@ -19,7 +21,7 @@ class GPT2EvaluationSpec(EvaluationSpec):
         rate: int,
     ):
         self.eval_corpus = eval_corpus
-        self.vocab_path = vocab_path
+        self.tokenizer_path = tokenizer_path
         self.seq_len = seq_len
         self.layers = layers
         self.heads = heads
@@ -27,7 +29,8 @@ class GPT2EvaluationSpec(EvaluationSpec):
         self.rate = rate
 
     def initialize(self):
-        self.vocab = Vocab(vocab_path=self.vocab_path)
+        self.tokenizer = Tokenizer.from_file(self.tokenizer_path)
+        self.vocab = Vocab(vocab=self.tokenizer.get_vocab())
         self.criterion = nn.CrossEntropyLoss(reduction="none")
 
     def prepare_dataset(self) -> Dataset:
@@ -66,8 +69,8 @@ class GPT2EvaluationSpec(EvaluationSpec):
 
 def evaluate_gpt2_model(args: argparse.Namespace):
     spec = GPT2EvaluationSpec(
-        eval_corpus=args.eval_corpus,
-        vocab_path=args.vocab_path,
+        eval_corpus=os.path.join(args.corpus_dir, args.eval_corpus),
+        tokenizer_path=os.path.join(args.corpus_dir, args.tokenizer_path),
         seq_len=args.seq_len,
         layers=args.layers,
         heads=args.heads,
@@ -78,23 +81,30 @@ def evaluate_gpt2_model(args: argparse.Namespace):
         batch_eval=args.batch_eval, total_steps=args.total_steps, use_gpu=args.use_gpu
     )
 
-    print(Evaluator(spec, config).evaluate(from_model=args.model_path))
+    print(
+        Evaluator(spec, config).evaluate(
+            from_model=os.path.join(args.corpus_dir, args.model_path)
+        )
+    )
 
 
 def add_subparser(subparsers: argparse._SubParsersAction):
     parser = subparsers.add_parser("evaluate", help="evaluate GPT-2 model")
 
-    parser.add_argument(
-        "--model_path", required=True, help="trained GPT-2 model file path"
-    )
-
     group = parser.add_argument_group("Corpus and vocabulary")
+    group.add_argument(
+        'corpus_dir', help='root directory of corpus files',
+        default=os.getcwd()
+    )
     group.add_argument(
         "--eval_corpus", required=True, help="evaluation corpus file path"
     )
-    group.add_argument("--vocab_path", required=True, help="vocabulary file path")
+    group.add_argument("--tokenizer_path", required=True, help="tokenizer file path")
 
     group = parser.add_argument_group("Model configurations")
+    group.add_argument(
+        "--model_path", required=True, help="trained GPT-2 model file path"
+    )
     group.add_argument(
         "--seq_len", default=64, type=int, help="maximum sequence length"
     )

@@ -1,3 +1,4 @@
+import json
 import torch
 from src.gpt2.data import Dataset, Vocab
 from typing import Dict, Any, List, Optional, Generator
@@ -45,7 +46,8 @@ class TokenizedCorpus(Dataset):
                 continue
 
             # Use token indices rather than the token names directly.
-            indices = [self.vocab[t] for t in line.split()]
+            tokens = json.loads(line)["tokens"]
+            indices = [self.vocab[t] for t in tokens.split()]
             stride = self.seq_len - self.overlap
 
             if len(indices) + 2 <= self.seq_len:

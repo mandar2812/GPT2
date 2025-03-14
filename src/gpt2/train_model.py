@@ -3,6 +3,7 @@ import argparse
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from tokenizers import Tokenizer
 from src.gpt2.utils import fusing
 from src.gpt2.modeling import Transformer
 from src.gpt2.data import Dataset, Vocab, TokenizedCorpus
@@ -11,13 +12,13 @@ from typing import Tuple, Iterator, Dict
 
 
 class GPT2TrainingSpec(TrainingSpec):
-    def __init__(self, train_corpus: str, eval_corpus: str, vocab_path: str,
+    def __init__(self, train_corpus: str, eval_corpus: str, tokenizer_path: str,
                  seq_len: int, layers: int, heads: int, dims: int, rate: int,
                  dropout: float, base_lr: float, wd_rate: float,
                  total_steps: int, use_grad_ckpt: bool):
         self.train_corpus = train_corpus
         self.eval_corpus = eval_corpus
-        self.vocab_path = vocab_path
+        self.tokenizer_path = tokenizer_path
         self.seq_len = seq_len
         self.layers = layers
         self.heads = heads
@@ -30,7 +31,8 @@ class GPT2TrainingSpec(TrainingSpec):
         self.use_grad_ckpt = use_grad_ckpt
 
     def initialize(self):
-        self.vocab = Vocab(vocab_path=self.vocab_path)
+        self.tokenizer = Tokenizer.from_file(self.tokenizer_path)
+        self.vocab = Vocab(vocab=self.tokenizer.get_vocab())
         self.criterion = nn.CrossEntropyLoss(ignore_index=self.vocab.pad_idx,
                                              reduction='mean')
 
@@ -73,9 +75,9 @@ class GPT2TrainingSpec(TrainingSpec):
 
 def train_gpt2_model(args: argparse.Namespace):
     spec = GPT2TrainingSpec(
-        train_corpus=os.path.join(args.corpus_dir, args.train_corpus), 
+        train_corpus=os.path.join(args.corpus_dir, args.train_corpus),
         eval_corpus=os.path.join(args.corpus_dir, args.eval_corpus),
-        vocab_path=os.path.join(args.corpus_dir, args.vocab_path), 
+        tokenizer_path=os.path.join(args.corpus_dir, args.tokenizer_path),
         seq_len=args.seq_len, layers=args.layers,
         heads=args.heads, dims=args.dims, rate=args.rate, dropout=args.dropout,
         base_lr=args.base_lr, wd_rate=args.wd_rate,
@@ -83,28 +85,29 @@ def train_gpt2_model(args: argparse.Namespace):
     config = TrainConfig(
         batch_train=args.batch_train, batch_eval=args.batch_eval,
         total_steps=args.total_steps, eval_steps=args.eval_steps,
-        save_steps=args.save_steps, save_model_path=args.save_model_path,
-        save_checkpoint_path=args.save_checkpoint_path,
+        save_steps=args.save_steps,
+        save_model_path=os.path.join(args.corpus_dir, args.save_model_path),
+        save_checkpoint_path=os.path.join(args.corpus_dir, args.save_checkpoint_path),
         description='Train GPT-2 model',
         log_format='train/loss: {train_loss:.4f}, eval/loss: {eval_loss:.4f}',
         use_amp=args.use_amp, gpus=args.gpus)
 
-    Trainer(spec, config).train(from_checkpoint=args.from_checkpoint,
-                                from_pretrained=args.from_pretrained)
+    Trainer(spec, config).train(from_checkpoint=os.path.join(args.corpus_dir, args.from_checkpoint),
+                                from_pretrained=os.path.join(args.corpus_dir, args.from_pretrained))
 
 
 def add_subparser(subparsers: argparse._SubParsersAction):
     parser = subparsers.add_parser('train', help='train GPT-2 model')
 
     group = parser.add_argument_group('Corpus and vocabulary')
-    group.add_argument('corpus_dir', help='root directory of corpus files', 
+    group.add_argument('corpus_dir', help='root directory of corpus files',
                         default=os.getcwd())
     group.add_argument('--train_corpus', required=True,
                        help='training corpus file path')
     group.add_argument('--eval_corpus', required=True,
                        help='evaluation corpus file path')
-    group.add_argument('--vocab_path', required=True,
-                       help='vocabulary file path')
+    group.add_argument('--tokenizer_path', required=True,
+                       help='tokenizer file path')
 
     group = parser.add_argument_group('Model configurations')
     group.add_argument('--seq_len', default=64, type=int,

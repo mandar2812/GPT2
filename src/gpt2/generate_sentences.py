@@ -12,44 +12,23 @@ from typing import List
 class GPT2GenerationSpec(GenerationSpec):
     def __init__(
         self,
-        vocab_path: str,
-        merges_path: str,
+        tokenizer_path: str,
         seq_len: int,
         layers: int,
         heads: int,
         dims: int,
         rate: int,
     ):
-        self.vocab_path = vocab_path
-        self.merges_path = merges_path
+        self.tokenizer_path = tokenizer_path
         self.seq_len = seq_len
         self.layers = layers
         self.heads = heads
         self.dims = dims
         self.rate = rate
-        self.vocab = Vocab(self.vocab_path)
-        self.tokenizer = Tokenizer(
-            models.BPE.from_file(
-                self.vocab_path, self.merges_path, unk_token=self.vocab.unk_token
-            )
-        )
 
     def initialize(self):
-        self.tokenizer.add_special_tokens(
-            [
-                self.vocab.unk_token,
-                self.vocab.eos_token,
-                self.vocab.bos_token,
-                self.vocab.pad_token,
-            ]
-        )
-
-        # Set normalizers (Unicode normalization + lowercasing)
-        self.tokenizer.normalizer = Sequence([NFKC(), Lowercase()])
-        # Set pre-tokenizer to byte-level (like GPT)
-        self.tokenizer.pre_tokenizer = ByteLevel()
-
-        self.tokenizer.decoder = decoders.ByteLevel()
+        self.tokenizer = Tokenizer.from_file(self.tokenizer_path)
+        self.vocab = Vocab(vocab=self.tokenizer.get_vocab())
 
     def construct_model(self) -> nn.Module:
         return Transformer(
@@ -73,8 +52,7 @@ class GPT2GenerationSpec(GenerationSpec):
 
 def generate_sentence_with_gpt2_model(args: argparse.Namespace):
     spec = GPT2GenerationSpec(
-        vocab_path=args.vocab_path,
-        merges_path=args.merges_path,
+        tokenizer_path=args.tokenizer_path,
         seq_len=args.seq_len,
         layers=args.layers,
         heads=args.heads,
@@ -97,8 +75,7 @@ def add_subparser(subparsers: argparse._SubParsersAction):
         "generate", help="generate sentences with GPT-2 model"
     )
 
-    parser.add_argument("--vocab_path", required=True, help="vocabulary file path")
-    parser.add_argument("--merges_path", required=True, help="merges file path")
+    parser.add_argument("--tokenizer_path", required=True, help="tokenizer file path")
     parser.add_argument(
         "--model_path", required=True, help="trained GPT-2 model file path"
     )
