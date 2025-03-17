@@ -28,7 +28,9 @@ class Evaluator(object):
             model.cuda().half()
 
         total_metrics = {}
-        with tqdm(desc="Evaluating GPT2") as pbar:
+        with tqdm(
+            desc="Evaluating GPT2", total=eval_dataset.size(self.config.batch_eval)
+        ) as pbar:
             eval_step = 0
             for _ in self.config.iterate():
                 batch_metrics = self._eval_step(eval_dataset, model)

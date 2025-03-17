@@ -27,7 +27,7 @@ class GPT2GenerationSpec(GenerationSpec):
         self.rate = rate
 
     def initialize(self):
-        self.tokenizer = Tokenizer.from_file(self.tokenizer_path)
+        self.tokenizer: Tokenizer = Tokenizer.from_file(self.tokenizer_path)
         self.vocab = Vocab(vocab=self.tokenizer.get_vocab())
 
     def construct_model(self) -> nn.Module:

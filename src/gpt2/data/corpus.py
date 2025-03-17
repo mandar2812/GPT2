@@ -88,3 +88,16 @@ class TokenizedCorpus(Dataset):
 
     def assign(self, where: Dict[str, Any]):
         self.corpus_fp.seek(where["offset"])
+
+    def size(self, batch: Optional[int] = None) -> int:
+        """Calculate the number of patterns in the corpus.
+        """
+        self.corpus_fp.seek(0)
+        def _num_patterns(line: str) -> int:
+            tokens = json.loads(line)["tokens"]
+            return ((len(tokens.split()) - self.seq_len) // (self.seq_len - self.overlap)) + 1
+        num_patterns = sum(_num_patterns(line) for line in self.corpus_fp)
+        if batch is None:
+            return num_patterns
+        else:
+            return num_patterns // batch
