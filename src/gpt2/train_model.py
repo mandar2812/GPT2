@@ -56,8 +56,8 @@ class GPT2TrainingSpec(TrainingSpec):
                                     optim.lr_scheduler._LRScheduler]:
         optimizer = fusing.Adam(
             params, lr=self.base_lr, weight_decay=self.wd_rate)
-        scheduler = optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=1_000_000, eta_min=1e-5)
+        scheduler = optim.lr_scheduler.CosineAnnealingWarmRestarts(
+            optimizer, T_0=50000, T_mult=1, eta_min=1e-6)
         return optimizer, scheduler
 
     def train_objective(self, data: Dict[str, torch.Tensor], model: nn.Module
@@ -85,7 +85,7 @@ def train_gpt2_model(args: argparse.Namespace):
     config = TrainConfig(
         batch_train=args.batch_train, batch_eval=args.batch_eval,
         total_steps=args.total_steps, eval_steps=args.eval_steps,
-        save_steps=args.save_steps,
+        save_steps=args.save_steps, save_version_steps=args.save_version_steps,
         save_model_path=os.path.join(args.corpus_dir, args.save_model_path),
         save_checkpoint_path=os.path.join(args.corpus_dir, args.save_checkpoint_path),
         description='Train GPT-2 model',
@@ -139,6 +139,8 @@ def add_subparser(subparsers: argparse._SubParsersAction):
                        help='period to evaluate model and record metrics')
     group.add_argument('--save_steps', default=1000, type=int,
                        help='period to save training state to checkpoint')
+    group.add_argument('--save_version_steps', default=-1, type=int,
+                       help='period to save a versioned/branched model.')
 
     group = parser.add_argument_group('Saving and restoring')
     group.add_argument('--save_model_path', default='model.pth',

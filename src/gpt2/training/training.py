@@ -155,6 +155,20 @@ class Trainer(object):
                 del ckpt
                 torch.cuda.empty_cache()
 
+            if (
+                rank == 0 and
+                self.config.save_version_steps > 0 and
+                (step + 1) % self.config.save_version_steps == 0
+            ):
+                versioned_model_path = self.config.save_model_path.replace(
+                    ".pth", f"-{step + 1}.pth"
+                )
+                torch.save(
+                    {"model": model.cpu().state_dict(), "metrics": recorder.metrics},
+                    versioned_model_path,
+                )
+                torch.cuda.empty_cache()
+
         if self.config.distributed:
             model = model.module
 
