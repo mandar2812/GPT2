@@ -97,6 +97,7 @@ class TokenizedCorpus(Dataset):
             tokens = json.loads(line)["tokens"]
             return ((len(tokens.split()) - self.seq_len) // (self.seq_len - self.overlap)) + 1
         num_patterns = sum(_num_patterns(line) for line in self.corpus_fp)
+        self.corpus_fp.seek(0)
         if batch is None:
             return num_patterns
         else:
