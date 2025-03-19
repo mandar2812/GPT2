@@ -164,7 +164,7 @@ class Trainer(object):
                     ".pth", f"-{step + 1}.pth"
                 )
                 torch.save(
-                    {"model": model.cpu().state_dict(), "metrics": recorder.metrics},
+                    {"model": model.state_dict(), "metrics": recorder.metrics},
                     versioned_model_path,
                 )
                 torch.cuda.empty_cache()
