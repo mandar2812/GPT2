@@ -2,7 +2,6 @@
 
 ![build](https://github.com/mandar2812/GPT2/workflows/build/badge.svg)
 ![GitHub](https://img.shields.io/github/license/mandar2812/GPT2)
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/affjljoo3581/GPT2/blob/master/GPT2_Interactive_Notebook.ipynb)
 [![codecov](https://codecov.io/gh/mandar2812/GPT2/branch/master/graph/badge.svg)](https://codecov.io/gh/affjljoo3581/GPT2)
 
 [Language Models are Unsupervised Multitask Learners](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
@@ -183,16 +182,5 @@ The example figure is as bellow:
 
 Mixed precision training is possible with `torch.amp`, provided your GPU meets the requirements. Use the `--use_amp` flag in the training program.
 
-## Play in Google Colab!
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/affjljoo3581/GPT2/blob/master/GPT2_Interactive_Notebook.ipynb)
-
-You can play trained GPT2 model in Google Colab! The above notebook contains text generation and metrics evaluation. You need to upload the trained model, vocabulary file and evaluation dataset to [Google Cloud Storage](https://cloud.google.com/storage).
-
-For the people who are interested in korean-version of GPT2, we rewrite the above notebook to provide the case of `gpt2-ko-302M` model especially, which is trained with about **5.04B** tokens from korean documents. You can play demo [in this notebook](https://colab.research.google.com/github/affjljoo3581/GPT2/blob/master/korean_gpt2_302M_demo.ipynb).
-
 ## License
 This project is [Apache-2.0 Licensed](./LICENSE).
-
-## Star History
-
-[![Star History Chart](https://api.star-history.com/svg?repos=affjljoo3581/GPT2&type=Date)](https://star-history.com/#affjljoo3581/GPT2&Date)
