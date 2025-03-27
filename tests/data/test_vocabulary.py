@@ -1,15 +1,21 @@
 from io import StringIO
-from unittest import mock
 from src.gpt2.data import Vocab
 
-_FAKE_VOCAB_DATA = "[UNK]\nTOKEN#1\nTOKEN#2\nTOKEN#3\nTOKEN#4"
+_FAKE_VOCAB = {
+    "[UNK]": 0,
+    "[BOS]": 1,
+    "[EOS]": 2,
+    "[PAD]": 3,
+    "TOKEN#1": 4,
+    "TOKEN#2": 5,
+    "TOKEN#3": 6,
+    "TOKEN#4": 7,
+}
 
 
-@mock.patch("builtins.open")
-def test_vocab_getitem(mock_open):
-    mock_open.return_value = StringIO(_FAKE_VOCAB_DATA)
+def test_vocab_getitem():
     vocab = Vocab(
-        vocab_path=None,
+        vocab=_FAKE_VOCAB,
         unk_token="[UNK]",
         bos_token="[BOS]",
         eos_token="[EOS]",
@@ -17,31 +23,29 @@ def test_vocab_getitem(mock_open):
     )
 
     # Get index by token.
-    assert vocab["[BOS]"] == 0
-    assert vocab["[EOS]"] == 1
-    assert vocab["[PAD]"] == 2
-    assert vocab["[UNK]"] == 3
+    assert vocab["[BOS]"] == 1
+    assert vocab["[EOS]"] == 2
+    assert vocab["[PAD]"] == 3
+    assert vocab["[UNK]"] == 0
     assert vocab["TOKEN#1"] == 4
     assert vocab["TOKEN#2"] == 5
     assert vocab["TOKEN#3"] == 6
     assert vocab["TOKEN#4"] == 7
 
     # Get token by index.
-    assert vocab[0] == "[BOS]"
-    assert vocab[1] == "[EOS]"
-    assert vocab[2] == "[PAD]"
-    assert vocab[3] == "[UNK]"
+    assert vocab[1] == "[BOS]"
+    assert vocab[2] == "[EOS]"
+    assert vocab[3] == "[PAD]"
+    assert vocab[0] == "[UNK]"
     assert vocab[4] == "TOKEN#1"
     assert vocab[5] == "TOKEN#2"
     assert vocab[6] == "TOKEN#3"
     assert vocab[7] == "TOKEN#4"
 
 
-@mock.patch("builtins.open")
-def test_vocab_contains(mock_open):
-    mock_open.return_value = StringIO(_FAKE_VOCAB_DATA)
+def test_vocab_contains():
     vocab = Vocab(
-        vocab_path=None,
+        vocab=_FAKE_VOCAB,
         unk_token="[UNK]",
         bos_token="[BOS]",
         eos_token="[EOS]",
@@ -65,11 +69,9 @@ def test_vocab_contains(mock_open):
     assert "TOKEN#8" not in vocab
 
 
-@mock.patch("builtins.open")
-def test_vocab_len(mock_open):
-    mock_open.return_value = StringIO(_FAKE_VOCAB_DATA)
+def test_vocab_len():
     vocab = Vocab(
-        vocab_path=None,
+        vocab=_FAKE_VOCAB,
         unk_token="[UNK]",
         bos_token="[BOS]",
         eos_token="[EOS]",
@@ -79,11 +81,9 @@ def test_vocab_len(mock_open):
     assert len(vocab) == 8
 
 
-@mock.patch("builtins.open")
-def test_vocab_properties(mock_open):
-    mock_open.return_value = StringIO(_FAKE_VOCAB_DATA)
+def test_vocab_properties():
     vocab = Vocab(
-        vocab_path=None,
+        vocab=_FAKE_VOCAB,
         unk_token="[UNK]",
         bos_token="[BOS]",
         eos_token="[EOS]",
@@ -91,7 +91,7 @@ def test_vocab_properties(mock_open):
     )
 
     # Get indices of special tokens by properties.
-    assert vocab.unk_idx == 3
-    assert vocab.bos_idx == 0
-    assert vocab.eos_idx == 1
-    assert vocab.pad_idx == 2
+    assert vocab.unk_idx == 0
+    assert vocab.bos_idx == 1
+    assert vocab.eos_idx == 2
+    assert vocab.pad_idx == 3

@@ -6,7 +6,7 @@ from src.gpt2.generation import GenerationSpec, GenerateConfig, Generator
 
 def test_generator_sample_from_top_p():
     generator = Generator(
-        spec=None, config=GenerateConfig(seq_len=0, nucleus_prob=0.5, use_gpu=False)
+        spec=None, config=GenerateConfig(context_len=0, nucleus_prob=0.5, use_gpu=False)
     )
 
     probs = torch.tensor([0.1, 0.2, 0.15, 0.08, 0.25, 0.22])
@@ -30,7 +30,7 @@ def test_generator_predict_probs_output_shape():
 
     # Create generator with simple specification.
     generator = Generator(
-        spec=spec, config=GenerateConfig(seq_len=0, nucleus_prob=0.5, use_gpu=False)
+        spec=spec, config=GenerateConfig(context_len=0, nucleus_prob=0.5, use_gpu=False)
     )
     generator.initialize()
 
@@ -51,24 +51,36 @@ def test_generator_predict_probs_output_shape():
 
 
 def test_generator_generate():
-    spec = GenerationSpec()
-    spec.construct_model = lambda: Transformer(
-        layers=2,
-        pad_idx=0,
-        words=80,
-        seq_len=50,
-        heads=2,
-        dims=16,
-        rate=4,
-        dropout=0,
-        bidirectional=False,
-    )
-    spec.encode_context = lambda context: list(range(len(context.split())))
-    spec.decode_tokens = lambda tokens: " ".join(str(t) for t in tokens)
+    class TestGenerationSpec(GenerationSpec):
+        def construct_model(self):
+            return Transformer(
+                layers=2,
+                pad_idx=0,
+                words=80,
+                seq_len=50,
+                heads=2,
+                dims=16,
+                rate=4,
+                dropout=0,
+                bidirectional=False,
+            )
+
+        def encode_context(self, context):
+            return list(range(len(context.split())))
+
+        def decode_tokens(self, tokens):
+            return " ".join(str(t) for t in tokens)
+
+        @property
+        def stop_token(self) -> int:
+            return 79
+
+    spec = TestGenerationSpec()
 
     # Create generator with simple specification.
     generator = Generator(
-        spec=spec, config=GenerateConfig(seq_len=50, nucleus_prob=0.5, use_gpu=False)
+        spec=spec,
+        config=GenerateConfig(context_len=50, nucleus_prob=0.5, use_gpu=False),
     )
     generator.initialize()
 
