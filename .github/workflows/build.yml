@@ -37,9 +37,7 @@ jobs:
       run: |
         pipenv run pytest --cov-report xml:coverage.xml --cov=src tests/
 
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v1
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v5
       with:
-        file: ./coverage.xml
-        name: codecov-umbrella
-        fail_ci_if_error: true
+        token: ${{ secrets.CODECOV_TOKEN }}
