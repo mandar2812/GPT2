@@ -1,10 +1,9 @@
 # GPT-2 PyTorch Implementation
 
-![build](https://github.com/affjljoo3581/GPT2/workflows/build/badge.svg)
-![GitHub](https://img.shields.io/github/license/affjljoo3581/GPT2)
+![build](https://github.com/mandar2812/GPT2/workflows/build/badge.svg)
+![GitHub](https://img.shields.io/github/license/mandar2812/GPT2)
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/affjljoo3581/GPT2/blob/master/GPT2_Interactive_Notebook.ipynb)
-[![codecov](https://codecov.io/gh/affjljoo3581/GPT2/branch/master/graph/badge.svg)](https://codecov.io/gh/affjljoo3581/GPT2)
-[![CodeFactor](https://www.codefactor.io/repository/github/affjljoo3581/gpt2/badge)](https://www.codefactor.io/repository/github/affjljoo3581/gpt2)
+[![codecov](https://codecov.io/gh/mandar2812/GPT2/branch/master/graph/badge.svg)](https://codecov.io/gh/affjljoo3581/GPT2)
 
 [Language Models are Unsupervised Multitask Learners](https://cdn.openai.com/better-language-models/language_models_are_unsupervised_multitask_learners.pdf)
 
@@ -23,7 +22,7 @@
 
 
 ## Introduction
-This project is a PyTorch implementation of OpenAI GPT-2 model. It provides model training, sentence generation, and metrics visualization. It is considered to be both understandable and optimized. We designed the codes to be comprehensible. Also we use [some techniques](#using-apex-in-training) to improve performance.
+This is a fork of the [affjljoo3581](https://github.com/affjljoo3581)'s excellent [GPT2 implementation](https://github.com/affjljoo3581/GPT2) implementation, with QA fine-tuning and rudimentary chat capabilities.
 
 ## Dependencies
 * regex
@@ -31,55 +30,54 @@ This project is a PyTorch implementation of OpenAI GPT-2 model. It provides mode
 * torch
 * numpy
 * matplotlib
+* pandas
+* Hugging Face Datasets
+* Hugging Face Tokenizers
 
 ## Usage
 
-### How to train?
-Before training GPT-2 model, corpus dataset should be prepared. We recommend to build your own corpus by using [Expanda](https://github.com/affjljoo3581/Expanda). Instead, training module requires tokenized training and evaluation datasets with their vocabulary file.
+### How to (pre) train?
 
-After preparing datasets, you can train GPT-2 by using as follows:
+Before pre-training GPT-2, corpus dataset should be prepared. We recommend to build your own corpus by using [Expanda](https://github.com/mandar2812/Expanda).
 
-    $ python -m gpt2 train --train_corpus           build/corpus.train.txt \
-                           --eval_corpus            build/corpus.test.txt \
-                           --vocab_path             build/vocab.txt \
-                           --save_checkpoint_path   ckpt-gpt2.pth \
-                           --save_model_path        gpt2-pretrained.pth
-                           --batch_train            128 \
-                           --batch_eval             128 \
-                           --seq_len                64 \
-                           --total_steps            1000000 \
-                           --eval_steps             500 \
-                           --save_steps             5000
+After preparing datasets, you can pre-train GPT-2 by using as follows:
+
+    $ pipenv run python -m src.gpt2 train DATA_CORPUS_BUILD_DIR \
+        --train_corpus           corpus.train.txt \
+        --eval_corpus            corpus.test.txt \
+        --tokenizer_path         tokenizer.json \
+        --save_checkpoint_path   ckpt-gpt2.pth \
+        --save_model_path        gpt2-pretrained.pth \
+        --batch_train            32 \
+        --batch_eval             32 \
+        --seq_len                256 \
+        --total_steps            10000 \
+        --eval_steps             1000 \
+        --save_steps             1000 \
+        --layers                 12 \
+        --use_amp --use_grad_ckpt
 
 To resume training from last checkpoint file, use `--from_checkpoint [last checkpoint file]` option.
 If you want to train GPT-2 with multiple GPUs, use `--gpus [number of gpus]` option.
 
 The detail of command-line usage is as follows:
 
-    usage: gpt2 train [-h] --train_corpus TRAIN_CORPUS --eval_corpus EVAL_CORPUS
-                      --vocab_path VOCAB_PATH [--seq_len SEQ_LEN]
-                      [--layers LAYERS] [--heads HEADS] [--dims DIMS]
-                      [--rate RATE] [--dropout DROPOUT]
-                      [--batch_train BATCH_TRAIN] [--batch_eval BATCH_EVAL]
-                      [--base_lr BASE_LR] [--wd_rate WD_RATE]
-                      [--total_steps TOTAL_STEPS] [--eval_steps EVAL_STEPS]
-                      [--save_steps SAVE_STEPS]
-                      [--save_model_path SAVE_MODEL_PATH]
-                      [--save_checkpoint_path SAVE_CHECKPOINT_PATH]
-                      [--from_checkpoint FROM_CHECKPOINT]
-                      [--from_pretrained FROM_PRETRAINED] [--use_amp]
-                      [--use_grad_ckpt] [--gpus GPUS]
+    usage: gpt2 train [-h] --train_corpus TRAIN_CORPUS --eval_corpus EVAL_CORPUS --tokenizer_path TOKENIZER_PATH [--seq_len SEQ_LEN] [--layers LAYERS] [--heads HEADS] [--dims DIMS] [--rate RATE] [--dropout DROPOUT]
+                  [--batch_train BATCH_TRAIN] [--batch_eval BATCH_EVAL] [--base_lr BASE_LR] [--wd_rate WD_RATE] [--total_steps TOTAL_STEPS] [--eval_steps EVAL_STEPS] [--save_steps SAVE_STEPS] [--save_version_steps SAVE_VERSION_STEPS]
+                  [--save_model_path SAVE_MODEL_PATH] [--save_checkpoint_path SAVE_CHECKPOINT_PATH] [--from_checkpoint FROM_CHECKPOINT] [--from_pretrained FROM_PRETRAINED] [--use_amp] [--use_grad_ckpt] [--gpus GPUS]
+                  corpus_dir
 
-    optional arguments:
+    options:
       -h, --help            show this help message and exit
 
     Corpus and vocabulary:
+      corpus_dir            root directory of corpus files
       --train_corpus TRAIN_CORPUS
                             training corpus file path
       --eval_corpus EVAL_CORPUS
                             evaluation corpus file path
-      --vocab_path VOCAB_PATH
-                            vocabulary file path
+      --tokenizer_path TOKENIZER_PATH
+                            tokenizer file path
 
     Model configurations:
       --seq_len SEQ_LEN     maximum sequence length
@@ -102,6 +100,8 @@ The detail of command-line usage is as follows:
                             period to evaluate model and record metrics
       --save_steps SAVE_STEPS
                             period to save training state to checkpoint
+      --save_version_steps SAVE_VERSION_STEPS
+                            period to save a versioned/branched model.
 
     Saving and restoring:
       --save_model_path SAVE_MODEL_PATH
@@ -118,7 +118,9 @@ The detail of command-line usage is as follows:
       --use_grad_ckpt       use gradient checkpointing in transformer layers
       --gpus GPUS           number of gpu devices to use in training
 
-### Generate sentences!
+
+### Generate sentences
+
 After training GPT-2, you can generate sentences with your trained model in interactive mode.
 
     $ python -m gpt2 generate --vocab_path      build/vocab.txt \
@@ -153,14 +155,25 @@ The detail of command-line usage is as follows:
 
 ### Evaluate the model
 
-One way to estimate the performance of trained model is to calculate the objective metrics with evaluation dataset, which is not used during training phase.
+To estimate the performance of trained model, calculate the objective metrics on the evaluation dataset.
 
-    $ python -m gpt2 evaluate --model_path model.pth --eval_corpus corpus.test.txt --vocab_path vocab.txt
+    $  pipenv run python -m src.gpt2 evaluate DATA_CORPUS_BUILD_DIR \
+        --eval_corpus            corpus.test.txt \
+        --tokenizer_path         tokenizer.json \
+        --model_path             gpt2-pretrained.pth \
+        --batch_eval             96 \               
+        --seq_len                256 \                                                         
+        --layers                 12 \
+        --use_gpu 
+
 
 ### Visualize metrics
-Moreover, you can also analyse training loss graph by visualizing recorded metrics.
 
-    $ python -m gpt2 visualize --model_path model.pth --interactive
+You can also analyse training loss graph by visualizing recorded metrics.
+
+    $ pipenv run python -m src.gpt2 visualize \
+        --model_path path/to/gpt2-pretrained.pth \
+        --figure src/build/gpt2-training.png
 
 The example figure is as bellow:
 
