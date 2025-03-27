@@ -35,7 +35,7 @@ jobs:
 
     - name: Generate coverage report
       run: |
-        pipenv run pytest --cov=./src --cov-report=xml tests/*
+        pipenv run pytest --cov-report xml:coverage.xml --cov=src tests/
 
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v1
