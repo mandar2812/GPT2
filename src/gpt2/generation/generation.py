@@ -2,6 +2,7 @@ from typing import List, Optional, Tuple
 
 import torch
 
+from src.gpt2.training import Recorder
 from src.gpt2.generation import GenerateConfig, GenerationSpec
 from src.gpt2.modeling import Past
 
@@ -18,6 +19,7 @@ class Generator(object):
 
         # Load trained model parameters.
         if from_model:
+            torch.serialization.add_safe_globals([Recorder])
             ckpt = torch.load(from_model, map_location="cpu")
             self.model.load_state_dict(ckpt["model"])
 
@@ -26,20 +28,23 @@ class Generator(object):
         if self.config.use_gpu:
             self.model.cuda().half()
 
-    def generate(self, context: str) -> str:
-        words = self.spec.encode_context(context)
-
-        current, past = words, None
-        while len(words) < self.config.seq_len:
+    def generate(self, context: str, chat: bool = False) -> str:
+        input_tokens = self.spec.encode_context(context)
+        output_tokens: list[int] = []
+        current, past = input_tokens, None
+        while len(input_tokens + output_tokens) < self.config.context_len:
             # Predict the next word token from the given context.
             probs, past = self._predict_probs(current, past)
             next_word = self._sample_from_top_p(probs)
 
             # Change the context to the predicted word.
-            words.append(next_word)
+            output_tokens.append(next_word)
+            if next_word == self.spec.stop_token:
+                break
             current = [next_word]
 
-        return self.spec.decode_tokens(words)
+        result = output_tokens if chat else input_tokens + output_tokens
+        return self.spec.decode_tokens(result)
 
     @torch.no_grad()
     def _predict_probs(

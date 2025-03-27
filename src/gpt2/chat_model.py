@@ -1,15 +1,17 @@
 import argparse
 import torch.nn as nn
+import re
 from tokenizers import Tokenizer, models, decoders
 from tokenizers.normalizers import NFKC, Lowercase, Sequence
 from tokenizers.pre_tokenizers import ByteLevel
 from src.gpt2.data import Vocab
 from src.gpt2.modeling import Transformer
 from src.gpt2.generation import GenerationSpec, GenerateConfig, Generator
+from src.gpt2.generate_sentences import GPT2GenerationSpec
 from typing import List
 
 
-class GPT2GenerationSpec(GenerationSpec):
+class GPT2ChatSpec(GPT2GenerationSpec):
     def __init__(
         self,
         tokenizer_path: str,
@@ -18,44 +20,36 @@ class GPT2GenerationSpec(GenerationSpec):
         heads: int,
         dims: int,
         rate: int,
+        message_boundaries: tuple[str, str] = ("<chmsg>", "</chmsg>"),
+        user_token: str = "<user>",
+        assistant_token: str = "<assistant>",
     ):
-        self.tokenizer_path = tokenizer_path
-        self.seq_len = seq_len
-        self.layers = layers
-        self.heads = heads
-        self.dims = dims
-        self.rate = rate
-
-    def initialize(self):
-        self.tokenizer: Tokenizer = Tokenizer.from_file(self.tokenizer_path)
-        self.vocab = Vocab(vocab=self.tokenizer.get_vocab())
-
-    def construct_model(self) -> nn.Module:
-        return Transformer(
-            layers=self.layers,
-            pad_idx=self.vocab.pad_idx,
-            words=len(self.vocab),
-            seq_len=self.seq_len,
-            heads=self.heads,
-            dims=self.dims,
-            rate=self.rate,
-            dropout=0.1,
-            bidirectional=False,
+        super(GPT2ChatSpec, self).__init__(
+            tokenizer_path,
+            seq_len,
+            layers,
+            heads,
+            dims,
+            rate,
         )
-
-    @property
-    def stop_token(self) -> int:
-        return self.vocab.eos_idx
+        self.message_start, self.message_end = message_boundaries
+        self.user_token = user_token
+        self.assistant_token = assistant_token
+        self.user_pattern = re.compile(rf"{self.user_token}.*?{self.message_end}(.*?)")
 
     def encode_context(self, context: str) -> List[int]:
-        return self.tokenizer.encode(context).ids
+        return self.tokenizer.encode(
+            f"{self.message_start}{self.user_token}{self.vocab.bos_token}"
+            + f"{context}{self.vocab.eos_token}{self.message_end}"
+        ).ids
 
     def decode_tokens(self, tokens: List[int]) -> str:
-        return self.tokenizer.decode(tokens)
+        response = self.tokenizer.decode(tokens)
+        return response
 
 
-def generate_sentence_with_gpt2_model(args: argparse.Namespace):
-    spec = GPT2GenerationSpec(
+def chat_with_gpt2_model(args: argparse.Namespace):
+    spec = GPT2ChatSpec(
         tokenizer_path=args.tokenizer_path,
         seq_len=args.context_len,
         layers=args.layers,
@@ -64,21 +58,19 @@ def generate_sentence_with_gpt2_model(args: argparse.Namespace):
         rate=args.rate,
     )
     config = GenerateConfig(
-        context_len=args.context_len,
-        nucleus_prob=args.nucleus_prob,
-        use_gpu=args.use_gpu,
+        context_len=args.context_len, nucleus_prob=args.nucleus_prob, use_gpu=args.use_gpu
     )
 
     generator = Generator(spec, config)
     generator.initialize(from_model=args.model_path)
 
     while True:
-        print(generator.generate(input(">>")))
+        print(generator.generate(input(">>"), chat=True))
 
 
 def add_subparser(subparsers: argparse._SubParsersAction):
     parser = subparsers.add_parser(
-        "generate", help="generate sentences with GPT-2 model"
+        "chat", help="Chat with GPT-2 model"
     )
 
     parser.add_argument("--tokenizer_path", required=True, help="tokenizer file path")
@@ -120,4 +112,4 @@ def add_subparser(subparsers: argparse._SubParsersAction):
         "--use_gpu", action="store_true", help="use gpu device in inferencing"
     )
 
-    parser.set_defaults(func=generate_sentence_with_gpt2_model)
+    parser.set_defaults(func=chat_with_gpt2_model)

@@ -1,4 +1,5 @@
 import json
+import re
 import torch
 from src.gpt2.data import Dataset, Vocab
 from typing import Dict, Any, List, Optional, Generator
@@ -11,7 +12,7 @@ class TokenizedCorpus(Dataset):
         vocab: Vocab,
         seq_len: int,
         repeat: bool = True,
-        overlap: int = None,
+        overlap: Optional[int] = None,
     ):
         self.corpus_fp = open(corpus_path, "r", encoding="utf-8")
         self.vocab = vocab
@@ -90,15 +91,114 @@ class TokenizedCorpus(Dataset):
         self.corpus_fp.seek(where["offset"])
 
     def size(self, batch: Optional[int] = None) -> int:
-        """Calculate the number of patterns in the corpus.
-        """
+        """Calculate the number of patterns in the corpus."""
         self.corpus_fp.seek(0)
+
         def _num_patterns(line: str) -> int:
             tokens = json.loads(line)["tokens"]
-            return ((len(tokens.split()) - self.seq_len) // (self.seq_len - self.overlap)) + 1
+            return (
+                (len(tokens.split()) - self.seq_len) // (self.seq_len - self.overlap)
+            ) + 1
+
         num_patterns = sum(_num_patterns(line) for line in self.corpus_fp)
         self.corpus_fp.seek(0)
         if batch is None:
             return num_patterns
         else:
             return num_patterns // batch
+
+
+class QATokenizedCorpus(TokenizedCorpus):
+    """Question Answer fine-tuning dataset where each line contains a pre-tokenized conversation."""
+
+    def __init__(
+        self,
+        corpus_path: str,
+        vocab: Vocab,
+        seq_len: int,
+        repeat: bool = True,
+        overlap: Optional[int] = None,
+        message_boundaries: tuple[str, str] = ("<chmsg>", "</chmsg>"),
+        user_token: str = "<user>",
+        assistant_token: str = "<assistant>",
+    ):
+        self.user_token = user_token
+        self.assistant_token = assistant_token
+        self.message_start, self.message_end = message_boundaries
+
+        # Regex pattern to extract user and assistant messages
+        self.user_pattern = re.compile(rf"{self.user_token}(.*?){self.message_end}")
+        self.assistant_pattern = re.compile(
+            rf"{self.assistant_token}(.*?){self.message_end}"
+        )
+        super(QATokenizedCorpus, self).__init__(
+            corpus_path, vocab, seq_len, repeat=repeat, overlap=overlap
+        )
+
+    def _fetch_one(self) -> Generator[Dict[str, List[int]], None, None]:
+        while True:
+            line = self.corpus_fp.readline()
+            if not line:
+                # Raise error when all sequences are fetched.
+                if not self.repeat:
+                    raise StopIteration()
+
+                # Or, move to the first of the corpus.
+                self.corpus_fp.seek(0)
+                continue
+
+            tokens = json.loads(line)["tokens"]
+
+            # Extract user and assistant messages
+            user_match = self.user_pattern.search(tokens)
+            assistant_match = self.assistant_pattern.search(tokens)
+
+            if not user_match or not assistant_match:
+                continue  # Skip malformed data
+
+            question_tokens = user_match.group(1).strip().split()
+            answer_tokens = assistant_match.group(1).strip().split()
+
+            # Convert tokens to indices
+            question_indices = [self.vocab[t] for t in question_tokens]
+            answer_indices = [self.vocab[t] for t in answer_tokens]
+
+            # Define input (only user message) and output (entire sequence)
+            input_ids = (
+                [self.vocab[t] for t in [self.message_start, self.user_token]]
+                + question_indices
+                + [self.vocab[self.message_end]]
+            )
+            sequence_indices = (
+                input_ids
+                + [self.vocab[t] for t in [self.message_start, self.assistant_token]]
+                + answer_indices
+                + [self.vocab[self.message_end]]
+            )
+
+            # Loss mask: 1 for assistant response, 0 otherwise
+            loss_mask = [0] * len(input_ids) + [0, 0] + [1] * len(answer_indices) + [0]
+
+            # Now do a sliding window of seq_len if the length is less than seq_len
+            stride = self.seq_len - self.overlap
+            if len(sequence_indices) <= self.seq_len:
+                window = sequence_indices + [self.vocab.pad_idx] * (
+                    self.seq_len - len(sequence_indices)
+                )
+                loss_mask = loss_mask + [0] * (self.seq_len - len(loss_mask))
+                yield {
+                    "input": window[:-1],
+                    "output": window[1:],
+                    "loss_mask": loss_mask[1:],
+                }
+            else:
+                for start in range(0, len(sequence_indices), stride):
+                    window = sequence_indices[start : start + self.seq_len]
+                    window += [self.vocab.pad_idx] * (self.seq_len - len(window))
+                    loss_mask_window = loss_mask[start : start + self.seq_len]
+                    loss_mask_window += [0] * (self.seq_len - len(loss_mask_window))
+                    yield {
+                        "input": window[:-1],
+                        "output": window[1:],
+                        "loss_mask": loss_mask_window[1:],
+                    }

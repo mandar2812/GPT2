@@ -92,8 +92,10 @@ def train_gpt2_model(args: argparse.Namespace):
         log_format='train/loss: {train_loss:.4f}, eval/loss: {eval_loss:.4f}',
         use_amp=args.use_amp, gpus=args.gpus)
 
-    Trainer(spec, config).train(from_checkpoint=os.path.join(args.corpus_dir, args.from_checkpoint),
-                                from_pretrained=os.path.join(args.corpus_dir, args.from_pretrained))
+    Trainer(spec, config).train(
+        from_checkpoint=os.path.join(args.corpus_dir, args.from_checkpoint) if args.from_checkpoint else None,
+        from_pretrained=os.path.join(args.corpus_dir, args.from_pretrained) if args.from_pretrained else None
+    )
 
 
 def add_subparser(subparsers: argparse._SubParsersAction):

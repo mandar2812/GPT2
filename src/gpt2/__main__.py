@@ -1,5 +1,12 @@
 import argparse
-from src.gpt2 import train_model, evaluate_model, generate_sentences, visualize_metrics
+from src.gpt2 import (
+    train_model,
+    finetune_model,
+    evaluate_model,
+    generate_sentences,
+    chat_model,
+    visualize_metrics,
+)
 
 
 if __name__ == "__main__":
@@ -14,6 +21,8 @@ if __name__ == "__main__":
     evaluate_model.add_subparser(subparsers)
     generate_sentences.add_subparser(subparsers)
     visualize_metrics.add_subparser(subparsers)
+    finetune_model.add_subparser(subparsers)
+    chat_model.add_subparser(subparsers)
 
     args = parser.parse_args()
     args.func(args)

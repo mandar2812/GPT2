@@ -7,6 +7,10 @@ class GenerationSpec(object):
     def initialize(self):
         pass
 
+    @property
+    def stop_token(self) -> int:
+        raise NotImplementedError()
+
     def construct_model(self) -> nn.Module:
         raise NotImplementedError()
 
