@@ -33,6 +33,32 @@ class TokenizedCorpus(Dataset):
                 self.corpus_fp.seek(0)
                 self.corpus_fp.readline()
 
+    def process_tokenized_record(self, tokens: str) -> dict[str: list[int]]:
+        """Convert tokenized text to indices."""
+        # Use token indices rather than the token names directly.
+        indices = [self.vocab[t] for t in tokens.split()]
+        stride = self.seq_len - self.overlap
+
+        if len(indices) + 2 <= self.seq_len:
+            # If the sequence is shorter than seq_len - 2, pad it
+            window = [self.vocab.bos_idx] + indices + [self.vocab.eos_idx]
+            window += [self.vocab.pad_idx] * (self.seq_len - len(window))
+            return {"input": window[:-1], "output": window[1:]}
+        else:
+            for start in range(0, len(indices), stride):
+                window = indices[start : start + (self.seq_len - 2)]
+
+                # Add BOS only for the first window
+                if start == 0:
+                    window = [self.vocab.bos_idx] + window
+
+                # Add EOS only for the last window
+                if start + (self.seq_len - 2) >= len(indices):
+                    window.append(self.vocab.eos_idx)
+
+                window += [self.vocab.pad_idx] * (self.seq_len - len(window))
+                return {"input": window[:-1], "output": window[1:]}
+
     def _fetch_one(self) -> Generator[Dict[str, List[int]], None, None]:
         while True:
             # Read subword-tokenized sequence from corpus.
@@ -45,31 +71,11 @@ class TokenizedCorpus(Dataset):
                 # Or, move to the first of the corpus.
                 self.corpus_fp.seek(0)
                 continue
-
-            # Use token indices rather than the token names directly.
             tokens = json.loads(line)["tokens"]
-            indices = [self.vocab[t] for t in tokens.split()]
-            stride = self.seq_len - self.overlap
-
-            if len(indices) + 2 <= self.seq_len:
-                # If the sequence is shorter than seq_len - 2, pad it
-                window = [self.vocab.bos_idx] + indices + [self.vocab.eos_idx]
-                window += [self.vocab.pad_idx] * (self.seq_len - len(window))
-                yield {"input": window[:-1], "output": window[1:]}
-            else:
-                for start in range(0, len(indices), stride):
-                    window = indices[start : start + (self.seq_len - 2)]
-
-                    # Add BOS only for the first window
-                    if start == 0:
-                        window = [self.vocab.bos_idx] + window
-
-                    # Add EOS only for the last window
-                    if start + (self.seq_len - 2) >= len(indices):
-                        window.append(self.vocab.eos_idx)
-
-                    window += [self.vocab.pad_idx] * (self.seq_len - len(window))
-                    yield {"input": window[:-1], "output": window[1:]}
+            record = self.process_tokenized_record(tokens)
+            if not record:
+                continue # Skip malformed records
+            yield record
 
     def fetch(self, batch: Optional[int] = None) -> Dict[str, torch.Tensor]:
         data = []
@@ -135,70 +141,64 @@ class QATokenizedCorpus(TokenizedCorpus):
             corpus_path, vocab, seq_len, repeat=repeat, overlap=overlap
         )
 
-    def _fetch_one(self) -> Generator[Dict[str, List[int]], None, None]:
-        while True:
-            line = self.corpus_fp.readline()
-            if not line:
-                # Raise error when all sequences are fetched.
-                if not self.repeat:
-                    raise StopIteration()
+    def process_tokenized_record(self, tokens: str) -> dict[str: list[int]]:
+        if self.message_start not in tokens:
+            # Treat this as a normal pretraining record
+            record = super(QATokenizedCorpus, self).process_tokenized_record(tokens)
+            loss_mask = [1] * len(record["output"])
+            return {**record, "loss_mask": loss_mask}
 
-                # Or, move to the first of the corpus.
-                self.corpus_fp.seek(0)
-                continue
+        # Treat as a QA/chat record with user and assistant roles
+        # Extract user and assistant messages
+        user_match = self.user_pattern.search(tokens)
+        assistant_match = self.assistant_pattern.search(tokens)
 
-            tokens = json.loads(line)["tokens"]
+        if not user_match or not assistant_match:
+            return {}
 
-            # Extract user and assistant messages
-            user_match = self.user_pattern.search(tokens)
-            assistant_match = self.assistant_pattern.search(tokens)
+        question_tokens = user_match.group(1).strip().split()
+        answer_tokens = assistant_match.group(1).strip().split()
 
-            if not user_match or not assistant_match:
-                continue  # Skip malformed data
+        # Convert tokens to indices
+        question_indices = [self.vocab[t] for t in question_tokens]
+        answer_indices = [self.vocab[t] for t in answer_tokens]
 
-            question_tokens = user_match.group(1).strip().split()
-            answer_tokens = assistant_match.group(1).strip().split()
+        # Define input (only user message) and output (entire sequence)
+        input_ids = (
+            [self.vocab[t] for t in [self.message_start, self.user_token]]
+            + question_indices
+            + [self.vocab[self.message_end]]
+        )
+        sequence_indices = (
+            input_ids
+            + [self.vocab[t] for t in [self.message_start, self.assistant_token]]
+            + answer_indices
+            + [self.vocab[self.message_end]]
+        )
 
-            # Convert tokens to indices
-            question_indices = [self.vocab[t] for t in question_tokens]
-            answer_indices = [self.vocab[t] for t in answer_tokens]
+        # Loss mask: 1 for assistant response, 0 otherwise
+        loss_mask = [0] * len(input_ids) + [0, 0] + [1] * len(answer_indices) + [0]
 
-            # Define input (only user message) and output (entire sequence)
-            input_ids = (
-                [self.vocab[t] for t in [self.message_start, self.user_token]]
-                + question_indices
-                + [self.vocab[self.message_end]]
+        # Now do a sliding window of seq_len if the length is less than seq_len
+        stride = self.seq_len - self.overlap
+        if len(sequence_indices) <= self.seq_len:
+            window = sequence_indices + [self.vocab.pad_idx] * (
+                self.seq_len - len(sequence_indices)
             )
-            sequence_indices = (
-                input_ids
-                + [self.vocab[t] for t in [self.message_start, self.assistant_token]]
-                + answer_indices
-                + [self.vocab[self.message_end]]
-            )
-
-            # Loss mask: 1 for assistant response, 0 otherwise
-            loss_mask = [0] * len(input_ids) + [0, 0] + [1] * len(answer_indices) + [0]
-
-            # Now do a sliding window of seq_len if the length is less than seq_len
-            stride = self.seq_len - self.overlap
-            if len(sequence_indices) <= self.seq_len:
-                window = sequence_indices + [self.vocab.pad_idx] * (
-                    self.seq_len - len(sequence_indices)
-                )
-                loss_mask = loss_mask + [0] * (self.seq_len - len(loss_mask))
-                yield {
+            loss_mask = loss_mask + [0] * (self.seq_len - len(loss_mask))
+            return {
+                "input": window[:-1],
+                "output": window[1:],
+                "loss_mask": loss_mask[1:],
+            }
+        else:
+            for start in range(0, len(sequence_indices), stride):
+                window = sequence_indices[start : start + self.seq_len]
+                window += [self.vocab.pad_idx] * (self.seq_len - len(window))
+                loss_mask_window = loss_mask[start : start + self.seq_len]
+                loss_mask_window += [0] * (self.seq_len - len(loss_mask_window))
+                return {
                     "input": window[:-1],
                     "output": window[1:],
-                    "loss_mask": loss_mask[1:],
+                    "loss_mask": loss_mask_window[1:],
                 }
-            else:
-                for start in range(0, len(sequence_indices), stride):
-                    window = sequence_indices[start : start + self.seq_len]
-                    window += [self.vocab.pad_idx] * (self.seq_len - len(window))
-                    loss_mask_window = loss_mask[start : start + self.seq_len]
-                    loss_mask_window += [0] * (self.seq_len - len(loss_mask_window))
-                    yield {
-                        "input": window[:-1],
-                        "output": window[1:],
-                        "loss_mask": loss_mask_window[1:],
-                    }
