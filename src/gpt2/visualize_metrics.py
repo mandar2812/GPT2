@@ -27,6 +27,7 @@ def _plot_entire_metrics_graph(
         linewidth=2,
         zorder=0,
     )
+    plt.grid(visible=True)
 
     plt.title("Cross-Entropy Loss")
     plt.xlabel("Iterations")
@@ -60,6 +61,7 @@ def _plot_log_scale_metrics_graph(
         linewidth=2,
         zorder=0,
     )
+    plt.grid(visible=True)
 
     plt.title("Log-Scale Loss Graph")
     plt.xlabel("Iterations (Log Scale)")
@@ -104,6 +106,7 @@ def _plot_stretched_metrics_graph(
         linewidth=1,
         zorder=1,
     )
+    plt.grid(visible=True)
 
     plt.title("Detail Loss Graph")
     plt.xlabel("Iterations")
@@ -154,6 +157,7 @@ def _plot_highlight_metrics_graph(
         linewidth=3,
         zorder=0,
     )
+    plt.grid(visible=True)
 
     plt.title("Detail Loss Graph")
     plt.xlabel("Iterations")
