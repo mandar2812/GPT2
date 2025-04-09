@@ -46,7 +46,6 @@ class GPT2EvaluationSpec(EvaluationSpec):
             layers=self.layers,
             pad_idx=self.vocab.pad_idx,
             words=len(self.vocab),
-            seq_len=self.seq_len,
             heads=self.heads,
             dims=self.dims,
             rate=self.rate,

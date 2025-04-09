@@ -1,6 +1,7 @@
 import argparse
 import os
-from typing import Dict, Tuple
+import json
+from typing import Any, Dict, Tuple
 
 import torch
 import torch.nn as nn
@@ -27,6 +28,7 @@ class QASFTSpec(GPT2TrainingSpec):
         dims: int,
         rate: int,
         dropout: float,
+        scaled_softmax: bool,
         base_lr: float,
         wd_rate: float,
         total_steps: int,
@@ -45,6 +47,7 @@ class QASFTSpec(GPT2TrainingSpec):
             dims=dims,
             rate=rate,
             dropout=dropout,
+            scaled_softmax=scaled_softmax,
             base_lr=base_lr,
             wd_rate=wd_rate,
             total_steps=total_steps,
@@ -111,6 +114,7 @@ class RLFTSpec(TrainingSpec):
         dims: int,
         rate: int,
         dropout: float,
+        scaled_softmax: bool,
         base_lr: float,
         wd_rate: float,
         total_steps: int,
@@ -129,6 +133,7 @@ class RLFTSpec(TrainingSpec):
         self.dims = dims
         self.rate = rate
         self.dropout = dropout
+        self.scaled_softmax = scaled_softmax
         self.base_lr = base_lr
         self.wd_rate = wd_rate
         self.total_steps = total_steps
@@ -173,13 +178,26 @@ class RLFTSpec(TrainingSpec):
             layers=self.layers,
             pad_idx=self.vocab.pad_idx,
             words=len(self.vocab),
-            seq_len=self.seq_len,
             heads=self.heads,
             dims=self.dims,
             rate=self.rate,
             dropout=self.dropout,
             bidirectional=False,
+            scaled_softmax=self.scaled_softmax,
         )
+
+    def model_config(self) -> dict[str, Any]:
+        return {
+            "layers": self.layers,
+            "pad_idx": self.vocab.pad_idx,
+            "words": len(self.vocab),
+            "heads": self.heads,
+            "dims": self.dims,
+            "rate": self.rate,
+            "dropout": self.dropout,
+            "bidirectional": False,
+            "scaled_softmax": self.scaled_softmax,
+        }
 
     def create_optimizer(self, params):
         optimizer = fusing.Adam(params, lr=self.base_lr, weight_decay=self.wd_rate)
@@ -383,16 +401,34 @@ class RLFTSpec(TrainingSpec):
 
 
 def train_qa_model(args: argparse.Namespace):
+    if args.from_model_config:
+        with open(
+            os.path.join(args.corpus_dir, args.from_model_config), "r", encoding="utf-8"
+        ) as f:
+            model_config = json.load(f)
+            model_kwargs = {
+                "layers": model_config["layers"],
+                "heads": model_config["heads"],
+                "dims": model_config["dims"],
+                "rate": model_config["rate"],
+                "dropout": model_config["dropout"],
+                "scaled_softmax": model_config["scaled_softmax"],
+            }
+    else:
+        model_kwargs = {
+            "layers": args.layers,
+            "heads": args.heads,
+            "dims": args.dims,
+            "rate": args.rate,
+            "dropout": args.dropout,
+            "scaled_softmax": args.scaled_softmax,
+        }
     spec = QASFTSpec(
         train_corpus=os.path.join(args.corpus_dir, args.train_corpus),
         eval_corpus=os.path.join(args.corpus_dir, args.eval_corpus),
         tokenizer_path=os.path.join(args.corpus_dir, args.tokenizer_path),
         seq_len=args.seq_len,
-        layers=args.layers,
-        heads=args.heads,
-        dims=args.dims,
-        rate=args.rate,
-        dropout=args.dropout,
+        **model_kwargs,
         base_lr=args.base_lr,
         wd_rate=args.wd_rate,
         total_steps=args.total_steps,
@@ -445,6 +481,11 @@ def add_subparser(subparsers: argparse._SubParsersAction):
 
     group = parser.add_argument_group("Model configurations")
     group.add_argument(
+        "--from_model_config",
+        default=None,
+        help="load model config from a json file",
+    )
+    group.add_argument(
         "--seq_len", default=64, type=int, help="maximum sequence length"
     )
     group.add_argument(
@@ -470,6 +511,11 @@ def add_subparser(subparsers: argparse._SubParsersAction):
         default=0.1,
         type=float,
         help="probability that each element is dropped",
+    )
+    group.add_argument(
+        "--scaled_softmax",
+        action="store_true",
+        help="use scaled softmax in attention layer",
     )
 
     group = parser.add_argument_group("Training and evaluation")

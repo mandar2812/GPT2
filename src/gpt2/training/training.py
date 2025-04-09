@@ -7,7 +7,7 @@ import torch.multiprocessing as mp
 from src.gpt2.data import Dataset
 from src.gpt2.training import TrainingSpec, TrainConfig, Recorder
 from typing import Dict, Optional
-
+import json
 import warnings
 
 warnings.filterwarnings(action="ignore")
@@ -17,6 +17,14 @@ class Trainer(object):
     def __init__(self, spec: TrainingSpec, config: TrainConfig):
         self.spec = spec
         self.config = config
+
+    def save_model_config(self, path: str):
+        """
+        Save model configuration to a file.
+        """
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(self.spec.model_config(), f, indent=4)
+            print(f"Model config saved to {path}")
 
     def train(
         self,
@@ -105,7 +113,9 @@ class Trainer(object):
                 desc=self.config.description,
                 dynamic_ncols=True,
             )
-           # training_iters.update(start_step + 1)
+            # training_iters.update(start_step + 1)
+            # Save the model config to a json file
+            self.save_model_config(self.config.save_model_path.replace(".pth", ".json"))
         else:
             # In other processes, use simple iterator rather than tqdm one.
             training_iters = range(start_step + 1, self.config.total_steps)

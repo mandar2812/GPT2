@@ -19,24 +19,33 @@ class BaseAttention(nn.Module):
     output          float           (..., query_len, dims)
     ===========================================================================
     """
-    def __init__(self, dropout: float = 0.1):
+
+    def __init__(self, dropout: float = 0.1, scaled_softmax: bool = False):
         super().__init__()
         self.dropout = nn.Dropout(dropout)
+        if scaled_softmax:
+            self.scale_param = nn.Parameter(torch.ones(1))
+        else:
+            self.scale_param = None
 
-    def forward(self,
-                q: torch.Tensor,
-                k: torch.Tensor,
-                v: torch.Tensor,
-                mask: Optional[torch.Tensor] = None,
-                bias: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+        bias: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         x = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(k.size(-1))
 
         if bias is not None:
             x += bias
 
         if mask is not None:
-            x += (mask.type_as(x) * x.new_tensor(-1e4))
+            x += mask.type_as(x) * x.new_tensor(-1e4)
 
+        if self.scale_param is not None:
+            x = x * self.scale_param * torch.log(torch.as_tensor(q.size(-2)))
         x = self.dropout(x.softmax(-1))
 
         return torch.matmul(x, v)
@@ -54,15 +63,18 @@ class MultiHeadAttention(BaseAttention):
     output          float           (..., query_len, dims)
     ===========================================================================
     """
-    def __init__(self, heads: int, dropout: float = 0.1):
-        super().__init__(dropout)
+
+    def __init__(self, heads: int, dropout: float = 0.1, scaled_softmax: bool = False):
+        super().__init__(dropout, scaled_softmax)
         self.heads = heads
 
-    def forward(self,
-                q: torch.Tensor,
-                k: torch.Tensor,
-                v: torch.Tensor,
-                mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+    def forward(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        mask: Optional[torch.Tensor] = None,
+    ) -> torch.Tensor:
         # Split the tensors to multi-heads.
         q = q.view(q.size()[:-1] + (self.heads, q.size(-1) // self.heads))
         k = k.view(k.size()[:-1] + (self.heads, k.size(-1) // self.heads))
@@ -76,10 +88,13 @@ class MultiHeadAttention(BaseAttention):
             mask = mask.unsqueeze(-3)
 
         # Calculate multi-headed attentions and merge them into one.
-        return (super().forward(q, k, v, mask)
-                .transpose(-3, -2)
-                .contiguous()
-                .view(q.size()[:-3] + (q.size(-2), v.size(-1) * self.heads)))
+        return (
+            super()
+            .forward(q, k, v, mask)
+            .transpose(-3, -2)
+            .contiguous()
+            .view(q.size()[:-3] + (q.size(-2), v.size(-1) * self.heads))
+        )
 
 
 class AttentionLayer(nn.Module):
@@ -96,21 +111,25 @@ class AttentionLayer(nn.Module):
     output 2 (*)    float           (..., past_len + kv_len, dims)
     ===========================================================================
     """
-    def __init__(self, heads: int, dims: int, dropout: float = 0.1):
+
+    def __init__(
+        self, heads: int, dims: int, dropout: float = 0.1, scaled_softmax: bool = False
+    ):
         super().__init__()
-        self.attn = MultiHeadAttention(heads, dropout)
+        self.attn = MultiHeadAttention(heads, dropout, scaled_softmax)
         self.proj_q = nn.Linear(dims, dims)
         self.proj_k = nn.Linear(dims, dims)
         self.proj_v = nn.Linear(dims, dims)
         self.linear = nn.Linear(dims, dims)
 
-    def forward(self,
-                q: torch.Tensor,
-                k: torch.Tensor,
-                v: torch.Tensor,
-                past: Optional[Past] = None,
-                mask: Optional[torch.Tensor] = None
-                ) -> Tuple[torch.Tensor, Past]:
+    def forward(
+        self,
+        q: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        past: Optional[Past] = None,
+        mask: Optional[torch.Tensor] = None,
+    ) -> Tuple[torch.Tensor, Past]:
         q, k, v = self.proj_q(q), self.proj_k(k), self.proj_v(v)
 
         # Reuse attention keys and values by concatenating to the current ones.

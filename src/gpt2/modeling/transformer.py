@@ -27,9 +27,16 @@ class TransformerLayer(nn.Module):
     ===========================================================================
     """
 
-    def __init__(self, heads: int, dims: int, rate: int, dropout: float = 0.1):
+    def __init__(
+        self,
+        heads: int,
+        dims: int,
+        rate: int,
+        dropout: float = 0.1,
+        scaled_softmax: bool = False,
+    ):
         super().__init__()
-        self.attn = AttentionLayer(heads, dims, dropout)
+        self.attn = AttentionLayer(heads, dims, dropout, scaled_softmax)
         self.ff = PositionwiseFeedForward(dims, rate, dropout)
         self.ln_attn = LayerNorm(dims)
         self.ln_ff = LayerNorm(dims)
@@ -67,24 +74,26 @@ class Transformer(nn.Module):
         layers: int,
         pad_idx: int,
         words: int,
-        seq_len: int,
         heads: int,
         dims: int,
         rate: int = 4,
         dropout: float = 0.1,
         bidirectional: bool = True,
+        scaled_softmax: bool = False,
     ):
         super().__init__()
         self.bidirectional = bidirectional
         self.pad_masking = PadMasking(pad_idx)
         self.future_masking = FutureMasking()
 
-        # self.positional_embedding = PositionalEmbedding(seq_len, dims)
         self.token_embedding = TokenEmbedding(words, dims, padding_idx=pad_idx)
         self.dropout_embedding = nn.Dropout(dropout)
 
         self.transformers = nn.ModuleList(
-            [TransformerLayer(heads, dims, rate, dropout) for _ in range(layers)]
+            [
+                TransformerLayer(heads, dims, rate, dropout, scaled_softmax)
+                for _ in range(layers)
+            ]
         )
         self.ln_head = LayerNorm(dims)
 
@@ -102,7 +111,7 @@ class Transformer(nn.Module):
             mask = mask + self.future_masking(x, offset)
 
         # Use token embedding.
-        x = self.token_embedding(x) # + self.positional_embedding(x, offset)
+        x = self.token_embedding(x)  # + self.positional_embedding(x, offset)
         x = self.dropout_embedding(x)
 
         # Apply transformer layers sequentially.

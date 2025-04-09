@@ -1,14 +1,11 @@
 import argparse
-import torch.nn as nn
+import json
+import os
 import re
-from tokenizers import Tokenizer, models, decoders
-from tokenizers.normalizers import NFKC, Lowercase, Sequence
-from tokenizers.pre_tokenizers import ByteLevel
-from src.gpt2.data import Vocab
-from src.gpt2.modeling import Transformer
-from src.gpt2.generation import GenerationSpec, GenerateConfig, Generator
-from src.gpt2.generate_sentences import GPT2GenerationSpec
 from typing import List
+
+from src.gpt2.generate_sentences import GPT2GenerationSpec
+from src.gpt2.generation import GenerateConfig, Generator
 
 
 class GPT2ChatSpec(GPT2GenerationSpec):
@@ -20,17 +17,14 @@ class GPT2ChatSpec(GPT2GenerationSpec):
         heads: int,
         dims: int,
         rate: int,
+        dropout: float,
+        scaled_softmax: bool,
         message_boundaries: tuple[str, str] = ("<chmsg>", "</chmsg>"),
         user_token: str = "<user>",
         assistant_token: str = "<assistant>",
     ):
         super(GPT2ChatSpec, self).__init__(
-            tokenizer_path,
-            seq_len,
-            layers,
-            heads,
-            dims,
-            rate,
+            tokenizer_path, seq_len, layers, heads, dims, rate, dropout, scaled_softmax
         )
         self.message_start, self.message_end = message_boundaries
         self.user_token = user_token
@@ -49,16 +43,37 @@ class GPT2ChatSpec(GPT2GenerationSpec):
 
 
 def chat_with_gpt2_model(args: argparse.Namespace):
+    if args.from_model_config:
+        with open(
+            args.from_model_config, "r", encoding="utf-8"
+        ) as f:
+            model_config = json.load(f)
+            model_kwargs = {
+                "layers": model_config["layers"],
+                "heads": model_config["heads"],
+                "dims": model_config["dims"],
+                "rate": model_config["rate"],
+                "dropout": model_config["dropout"],
+                "scaled_softmax": model_config["scaled_softmax"],
+            }
+    else:
+        model_kwargs = {
+            "layers": args.layers,
+            "heads": args.heads,
+            "dims": args.dims,
+            "rate": args.rate,
+            "dropout": args.dropout,
+            "scaled_softmax": args.scaled_softmax,
+        }
     spec = GPT2ChatSpec(
         tokenizer_path=args.tokenizer_path,
         seq_len=args.context_len,
-        layers=args.layers,
-        heads=args.heads,
-        dims=args.dims,
-        rate=args.rate,
+        **model_kwargs,
     )
     config = GenerateConfig(
-        context_len=args.context_len, nucleus_prob=args.nucleus_prob, use_gpu=args.use_gpu
+        context_len=args.context_len,
+        nucleus_prob=args.nucleus_prob,
+        use_gpu=args.use_gpu,
     )
 
     generator = Generator(spec, config)
@@ -69,9 +84,7 @@ def chat_with_gpt2_model(args: argparse.Namespace):
 
 
 def add_subparser(subparsers: argparse._SubParsersAction):
-    parser = subparsers.add_parser(
-        "chat", help="Chat with GPT-2 model"
-    )
+    parser = subparsers.add_parser("chat", help="Chat with GPT-2 model")
 
     parser.add_argument("--tokenizer_path", required=True, help="tokenizer file path")
     parser.add_argument(
@@ -79,6 +92,11 @@ def add_subparser(subparsers: argparse._SubParsersAction):
     )
 
     group = parser.add_argument_group("Model configurations")
+    group.add_argument(
+        "--from_model_config",
+        default=None,
+        help="load model config from a json file",
+    )
     group.add_argument(
         "--context_len", default=64, type=int, help="maximum context length"
     )
@@ -99,6 +117,17 @@ def add_subparser(subparsers: argparse._SubParsersAction):
         default=4,
         type=int,
         help="increase rate of dimensionality in bottleneck",
+    )
+    group.add_argument(
+        "--dropout",
+        default=0.1,
+        type=float,
+        help="probability that each element is dropped",
+    )
+    group.add_argument(
+        "--scaled_softmax",
+        action="store_true",
+        help="use scaled softmax in attention layer",
     )
 
     group = parser.add_argument_group("Generation options")

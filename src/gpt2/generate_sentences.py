@@ -1,12 +1,14 @@
 import argparse
-import torch.nn as nn
-from tokenizers import Tokenizer, models, decoders
-from tokenizers.normalizers import NFKC, Lowercase, Sequence
-from tokenizers.pre_tokenizers import ByteLevel
-from src.gpt2.data import Vocab
-from src.gpt2.modeling import Transformer
-from src.gpt2.generation import GenerationSpec, GenerateConfig, Generator
+import json
+import os
 from typing import List
+
+import torch.nn as nn
+from tokenizers import Tokenizer
+
+from src.gpt2.data import Vocab
+from src.gpt2.generation import GenerateConfig, GenerationSpec, Generator
+from src.gpt2.modeling import Transformer
 
 
 class GPT2GenerationSpec(GenerationSpec):
@@ -18,6 +20,8 @@ class GPT2GenerationSpec(GenerationSpec):
         heads: int,
         dims: int,
         rate: int,
+        dropout: float,
+        scaled_softmax: bool
     ):
         self.tokenizer_path = tokenizer_path
         self.seq_len = seq_len
@@ -25,6 +29,8 @@ class GPT2GenerationSpec(GenerationSpec):
         self.heads = heads
         self.dims = dims
         self.rate = rate
+        self.dropout = dropout
+        self.scaled_softmax = scaled_softmax
 
     def initialize(self):
         self.tokenizer: Tokenizer = Tokenizer.from_file(self.tokenizer_path)
@@ -35,11 +41,11 @@ class GPT2GenerationSpec(GenerationSpec):
             layers=self.layers,
             pad_idx=self.vocab.pad_idx,
             words=len(self.vocab),
-            seq_len=self.seq_len,
             heads=self.heads,
             dims=self.dims,
             rate=self.rate,
-            dropout=0.1,
+            dropout=self.dropout,
+            scaled_softmax=self.scaled_softmax,
             bidirectional=False,
         )
 
@@ -55,13 +61,32 @@ class GPT2GenerationSpec(GenerationSpec):
 
 
 def generate_sentence_with_gpt2_model(args: argparse.Namespace):
+    if args.from_model_config:
+        with open(
+            args.from_model_config, "r", encoding="utf-8"
+        ) as f:
+            model_config = json.load(f)
+            model_kwargs = {
+                "layers": model_config["layers"],
+                "heads": model_config["heads"],
+                "dims": model_config["dims"],
+                "rate": model_config["rate"],
+                "dropout": model_config["dropout"],
+                "scaled_softmax": model_config["scaled_softmax"],
+            }
+    else:
+        model_kwargs = {
+            "layers": args.layers,
+            "heads": args.heads,
+            "dims": args.dims,
+            "rate": args.rate,
+            "dropout": args.dropout,
+            "scaled_softmax": args.scaled_softmax,
+        }
     spec = GPT2GenerationSpec(
         tokenizer_path=args.tokenizer_path,
         seq_len=args.context_len,
-        layers=args.layers,
-        heads=args.heads,
-        dims=args.dims,
-        rate=args.rate,
+        **model_kwargs,
     )
     config = GenerateConfig(
         context_len=args.context_len,
@@ -88,6 +113,11 @@ def add_subparser(subparsers: argparse._SubParsersAction):
 
     group = parser.add_argument_group("Model configurations")
     group.add_argument(
+        "--from_model_config",
+        default=None,
+        help="load model config from a json file",
+    )
+    group.add_argument(
         "--context_len", default=64, type=int, help="maximum context length"
     )
     group.add_argument(
@@ -107,6 +137,17 @@ def add_subparser(subparsers: argparse._SubParsersAction):
         default=4,
         type=int,
         help="increase rate of dimensionality in bottleneck",
+    )
+    group.add_argument(
+        "--dropout",
+        default=0.1,
+        type=float,
+        help="probability that each element is dropped",
+    )
+    group.add_argument(
+        "--scaled_softmax",
+        action="store_true",
+        help="use scaled softmax in attention layer",
     )
 
     group = parser.add_argument_group("Generation options")

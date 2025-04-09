@@ -1,4 +1,4 @@
-from typing import Dict, Iterator, Tuple
+from typing import Any, Dict, Iterator, Tuple
 
 import torch
 import torch.nn as nn
@@ -15,6 +15,9 @@ class TrainingSpec(object):
         raise NotImplementedError()
 
     def construct_model(self) -> nn.Module:
+        raise NotImplementedError()
+    
+    def model_config(self) -> dict[str, Any]:
         raise NotImplementedError()
 
     def create_optimizer(
