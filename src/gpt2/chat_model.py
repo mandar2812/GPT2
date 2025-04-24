@@ -73,6 +73,7 @@ def chat_with_gpt2_model(args: argparse.Namespace):
     config = GenerateConfig(
         context_len=args.context_len,
         nucleus_prob=args.nucleus_prob,
+        temperature=args.temperature,
         use_gpu=args.use_gpu,
     )
 
@@ -136,6 +137,12 @@ def add_subparser(subparsers: argparse._SubParsersAction):
         default=0.85,
         type=float,
         help="probability threshold for nucleus sampling",
+    )
+    group.add_argument(
+        "--temperature",
+        default=1.0,
+        type=float,
+        help="temperature for sampling from the distribution",
     )
     group.add_argument(
         "--use_gpu", action="store_true", help="use gpu device in inferencing"

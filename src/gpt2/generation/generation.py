@@ -61,7 +61,7 @@ class Generator(object):
         else:
             logits, past = self.model(x, past)
 
-        return logits[-1, :].softmax(-1), past
+        return (logits[-1, :] / self.config.temperature).softmax(-1), past
 
     def _sample_from_top_p(self, probs: torch.Tensor) -> int:
         probs, indices = probs.sort(descending=True)
@@ -69,6 +69,7 @@ class Generator(object):
         mask = probs.cumsum(-1) > self.config.nucleus_prob
         mask[0] = False
         probs.masked_fill_(mask, 0)
+        probs /= probs.sum()
 
         # Sample from filtered distribution.
         return indices[probs.multinomial(1)[0]].item()
