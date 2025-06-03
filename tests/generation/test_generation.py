@@ -6,7 +6,10 @@ from src.gpt2.generation import GenerationSpec, GenerateConfig, Generator
 
 def test_generator_sample_from_top_p():
     generator = Generator(
-        spec=None, config=GenerateConfig(context_len=0, nucleus_prob=0.5, use_gpu=False)
+        spec=None,
+        config=GenerateConfig(
+            context_len=0, nucleus_prob=0.5, temperature=1.0, use_gpu=False
+        ),
     )
 
     probs = torch.tensor([0.1, 0.2, 0.15, 0.08, 0.25, 0.22])
@@ -29,7 +32,10 @@ def test_generator_predict_probs_output_shape():
 
     # Create generator with simple specification.
     generator = Generator(
-        spec=spec, config=GenerateConfig(context_len=0, nucleus_prob=0.5, use_gpu=False)
+        spec=spec,
+        config=GenerateConfig(
+            context_len=0, nucleus_prob=0.5, temperature=1.0, use_gpu=False
+        ),
     )
     generator.initialize()
 
@@ -78,7 +84,9 @@ def test_generator_generate():
     # Create generator with simple specification.
     generator = Generator(
         spec=spec,
-        config=GenerateConfig(context_len=50, nucleus_prob=0.5, use_gpu=False),
+        config=GenerateConfig(
+            context_len=50, nucleus_prob=0.5, temperature=1.0, use_gpu=False
+        ),
     )
     generator.initialize()
 
