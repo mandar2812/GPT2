@@ -12,7 +12,7 @@ def initialize_nn_weights(tensor, param=0.01):
 
 
 class _PcDEQLinearLayer(nn.Module):
-    def __init__(self, out_features, act):
+    def __init__(self, out_features, act: str):
         super().__init__()
         self.w = nn.Linear(out_features, out_features, bias=False)
         self.w.weight = nn.Parameter(initialize_nn_weights(self.w.weight.data, 1e-4))
@@ -29,7 +29,7 @@ class _PcDEQLinearLayer(nn.Module):
 
 
 class PcDEQ1LinearLayer(_PcDEQLinearLayer):
-    def _get_activation(self, act):
+    def _get_activation(self, act: str):
         match act:
             case "tanh":
                 return nn.Tanh()
@@ -44,7 +44,7 @@ class PcDEQ1LinearLayer(_PcDEQLinearLayer):
 
 
 class PcDEQ2LinearLayer(_PcDEQLinearLayer):
-    def _get_activation(self, act):
+    def _get_activation(self, act: str):
         if act == "sigmoid":
             return nn.Sigmoid()
 
@@ -54,7 +54,7 @@ class PcDEQ2LinearLayer(_PcDEQLinearLayer):
 
 
 class _PcDEQConvLayer(nn.Module):
-    def __init__(self, out_features, act):
+    def __init__(self, out_features, act: str):
         super().__init__()
         self.w = nn.Conv2d(out_features, out_features, 3, padding=1, bias=False)
         self.w.weight = nn.Parameter(initialize_nn_weights(self.w.weight.data, 1e-4))
@@ -71,7 +71,7 @@ class _PcDEQConvLayer(nn.Module):
 
 
 class PcDEQ1ConvLayer(_PcDEQConvLayer):
-    def _get_activation(self, act):
+    def _get_activation(self, act: str):
         match act:
             case "tanh":
                 return nn.Tanh()
@@ -86,7 +86,7 @@ class PcDEQ1ConvLayer(_PcDEQConvLayer):
 
 
 class PcDEQ2ConvLayer(_PcDEQConvLayer):
-    def _get_activation(self, act):
+    def _get_activation(self, act: str):
         if act == "sigmoid":
             return nn.Sigmoid()
 

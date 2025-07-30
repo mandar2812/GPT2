@@ -9,13 +9,13 @@ from src.gpt2.modeling.deq.layers import (
     PcDEQ2ConvLayer,
     PcTransformerDEQLayer,
 )
-from src.gpt2.modeling.deq.solvers import fixed_point_iteration
+from src.gpt2.modeling.deq.solvers import FixedPointSolver, fixed_point_iteration
 
 
 class DEQFixedPoint(nn.Module):
-    def __init__(self, f, solver, **kwargs):
+    def __init__(self, f: nn.Module, solver: FixedPointSolver, **kwargs):
         super().__init__()
-        self.f = f
+        self.f: nn.Module = f
         self.solver = solver
         self.iter_forward = 0
         self.iter_backward = 0
@@ -23,15 +23,15 @@ class DEQFixedPoint(nn.Module):
         self.res_forward = 0
         self.res_backward = 0
 
-    def forward(self, x):
+    def forward(self, x, **fkwargs):
         with torch.no_grad():
             z, self.res_forward, self.iter_forward = self.solver(
-                lambda z: self.f(z, x), torch.zeros_like(x), **self.kwargs
+                lambda z: self.f(z, x, **fkwargs), torch.zeros_like(x), **self.kwargs
             )
-        z = self.f(z, x)
+        z = self.f(z, x, **fkwargs)
 
         z0 = z.clone().detach().requires_grad_()
-        f0 = self.f(z0, x)
+        f0 = self.f(z0, x, **fkwargs)
 
         def backward_hook(grad):
             g, self.res_backward, self.iter_backward = self.solver(
@@ -122,13 +122,11 @@ class PcTransformerDEQBlock(nn.Module):
             **kwargs
         )
 
-    def forward(self, z0, x, src_mask=None):
-        z = self.deq(z0, x, src_mask=src_mask)
+    def forward(self, x, src_mask=None):
+        z = self.deq(x, src_mask=src_mask)
         return z
 
     def clamp(self):
-        self.deq.f.w_attn.weight_v.data.clamp_(min=0)
-        self.deq.f.w_attn.weight_g.data.clamp_(min=0)
-        self.deq.f.w_ff.weight_v.data.clamp_(min=0)
-        self.deq.f.w_ff.weight_g.data.clamp_(min=0)
+        self.deq.f.w_attn.weight.data.clamp_(min=0)
+        self.deq.f.w_ff.weight.data.clamp_(min=0)
         self.deq.f.w_out.weight.data.clamp_(min=0)

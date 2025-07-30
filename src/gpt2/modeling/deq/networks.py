@@ -217,7 +217,7 @@ class PcDEQTransformer(nn.Module):
     def __init__(self, d_model, nhead, hidden, vocab_size, max_iter=10):
         super().__init__()
         self.embedding = nn.Embedding(vocab_size, d_model)
-        activation = torch.log1p  # concave, increasing on R+, alternative: softsign
+        activation = nn.Softsign()  # concave, increasing on R+
         self.transformer_block = PcTransformerDEQBlock(
             d_model, nhead, hidden, activation=activation, max_iter=max_iter
         )
